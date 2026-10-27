@@ -4,7 +4,7 @@
 (function () {
   'use strict';
   const FC = window.FC;
-  const { BY, generate, renderPlot, shapeIcon, allowed, observed, markersOf, plotMarkers, fits, countSolutions, why, describe, LEVELS } = FC;
+  const { BY, generate, renderPlot, shapeIcon, allowed, observed, markersOf, plotMarkers, fits, countSolutions, why, describe, LEVELS, gateCode, geom, axes, axisVal, isFscSsc, isScatter } = FC;
   const $ = s => document.querySelector(s);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
@@ -75,7 +75,7 @@
       }
       h += '</div></section>';
     }
-    h += `<div class="menu-foot on-page"><span class="muted">Easy: more plots, reference filled in · Medium: fewest plots · Hard: more populations, a red herring, and a share-of-events question</span><button class="btn" data-settings>Settings</button></div></main>`;
+    h += `<div class="menu-foot on-page"><span class="muted">Easy: more plots, reference filled in · Medium: fewest plots · Hard: no labels (you place the gates), populations that touch, a red herring and a share-of-events question</span><button class="btn" data-settings>Settings</button></div></main>`;
     $('#menu').innerHTML = h;
   }
   $('#menu').addEventListener('click', ev => {
@@ -90,6 +90,13 @@
     const P = generate(seed, level, mode);
     S = { mode, level, seed, P, marks: {}, checked: {}, wrongChecks: 0, hints: 0, peeks: new Set(), pad: {}, padRow: null, tab: 'answer', sheet: 'open', focus: null, phase: 'play', pctPick: null, msg: null, flash: null };
     if (saved) Object.assign(S, { marks: saved.marks || {}, checked: saved.checked || {}, wrongChecks: saved.wrongChecks || 0, hints: saved.hints || 0, peeks: new Set(saved.peeks || []), pad: saved.pad || {}, phase: saved.phase || 'play', pctPick: saved.pctPick || null, msg: saved.msg || null, stats: saved.stats });
+    if (gating()) {
+      S.gates = (saved && saved.gates) || initGates();
+      S.sigSlot = (saved && saved.sigSlot) || {}; S.slotSig = {};
+      S.cloneRow = (saved && saved.cloneRow) || null;
+      regroup();
+    }
+    $('#game').classList.toggle('gating', gating());
     if (location.hash.slice(1) !== `${mode}/${level}/${seed}`) history.replaceState(null, '', `#${mode}/${level}/${seed}`);
     $('#menu').hidden = true; $('#game').hidden = false;
     $('#gMode').textContent = MODES[mode].name;
@@ -101,7 +108,7 @@
   }
   function persist() {
     if (!S) return;
-    save('flowcyto.current', { mode: S.mode, level: S.level, seed: S.seed, marks: S.marks, checked: S.checked, wrongChecks: S.wrongChecks, hints: S.hints, peeks: [...S.peeks], pad: S.pad, phase: S.phase, pctPick: S.pctPick, msg: S.msg, stats: S.stats });
+    save('flowcyto.current', { mode: S.mode, level: S.level, seed: S.seed, marks: S.marks, checked: S.checked, wrongChecks: S.wrongChecks, hints: S.hints, peeks: [...S.peeks], pad: S.pad, phase: S.phase, pctPick: S.pctPick, msg: S.msg, stats: S.stats, gates: S.gates, sigSlot: S.sigSlot, cloneRow: S.cloneRow });
   }
 
   const shownPlots = () => S.P.plots.map(p => [p.x, p.y]);
@@ -110,9 +117,80 @@
   const freePeeks = () => S.level === 'easy';
   const plotName = pl => pl.x === 'LC' ? 'kappa / lambda' : pl.x + ' / ' + pl.y;
 
+  // ---------- Hard: the player's quad gates define the groups ----------
+  /* Every event gets a signature: which part of each plot's gate it falls in. Each signature big
+     enough to matter (2% of events) is a group, painted with its own letter, shape and color in every
+     plot. Good gates give one group per population; a gate through a cluster splits it, a gate on the
+     wrong side merges two. A population that is partly positive by nature (normal B cells: kappa and
+     lambda; CD23; hematogones maturing) shows as two clusters even with perfect gates, so groups of
+     one population that differ only on such a marker are merged. Letters stick to their cluster. */
+  const gating = () => !!(S && LEVELS[S.level].gating);
+  function initGates() {
+    const r = FC.mulberry32((S.seed ^ 0x5bd1e995) >>> 0);
+    const start = mk => isScatter(mk) ? 150 + r() * 500 : 0.8 + r() * 1.9;
+    return S.P.plots.map(pl => isFscSsc(pl) ? { y1: 140 + r() * 260, y2: 430 + r() * 300 } : { x: start(axes(pl)[0]), y: start(axes(pl)[1]) });
+  }
+  // Is population p naturally split on this axis (so a gate there is right to cut it)?
+  function naturallySplit(p, mk) {
+    if (mk === 'LCk' || mk === 'LCl') return p.lc === 'poly';
+    if (mk === 'FSC' || mk === 'SSC') return false;
+    return observed(p, mk) === 'split';
+  }
+  function regroup() {
+    const P = S.P, n = P.pops.length, total = P.events.reduce((a, e) => a + e.length, 0);
+    const sig = P.events.map(evs => evs.map(e => P.plots.map((pl, i) => gateCode(e, pl, S.gates[i])).join('')));
+    const tally = new Map();
+    sig.forEach((arr, k) => arr.forEach(x => { let g = tally.get(x); if (!g) tally.set(x, g = { sig: x, n: 0, by: new Array(n).fill(0) }); g.n++; g.by[k]++; }));
+    let big = [...tally.values()].filter(g => g.n >= Math.max(8, total * 0.02)).sort((a, b) => b.n - a.n);
+    // merge clusters of one population that differ only where it is naturally split
+    const major = g => g.by.indexOf(Math.max(...g.by));
+    const onlyNatural = (a, b, p) => [...a.sig].every((c, i) => {
+      if (c === b.sig[i]) return true;
+      const [xm, ym] = axes(P.plots[i]), d = (+c) ^ (+b.sig[i]);
+      if (isFscSsc(P.plots[i])) return false;
+      return (!(d & 2) || naturallySplit(p, xm)) && (!(d & 1) || naturallySplit(p, ym));
+    });
+    const merged = [];
+    for (const g of big) {
+      const k = major(g), p = P.pops[k];
+      const host = g.by[k] / g.n >= 0.85 && merged.find(m => major(m) === k && m.by[k] / m.n >= 0.85 && m.members.some(x => onlyNatural(x, g, p)));
+      if (host) { host.members.push(g); host.n += g.n; g.by.forEach((v, i) => { host.by[i] += v; }); }
+      else merged.push({ sig: g.sig, n: g.n, by: g.by.slice(), members: [g] });
+    }
+    // A small tail of one population (under a quarter of it) beside its main cluster is stragglers, not
+    // a group: drawn gray and never counted. A gate through the middle of a cluster still splits it.
+    const size = P.events.map(e => e.length);
+    big = merged.filter(g => { const k = major(g); return !(g.by[k] < 0.25 * size[k] && merged.some(h => h !== g && major(h) === k && h.by[k] > g.by[k])); });
+    const slotOf = {}, used = new Set();
+    for (const g of big) { const x = S.sigSlot[g.sig]; if (x != null && !used.has(x)) { slotOf[g.sig] = x; used.add(x); } }
+    for (const g of big) if (slotOf[g.sig] == null) { const f = [0, 1, 2, 3, 4].find(x => !used.has(x)); if (f != null) { slotOf[g.sig] = f; used.add(f); } }
+    // a letter that now names a different cluster loses its old marks
+    for (const [sg, slot] of Object.entries(slotOf)) {
+      const L = 'ABCDE'[slot];
+      if (S.slotSig[slot] && S.slotSig[slot] !== sg) { for (const k of Object.keys(S.marks)) if (k.startsWith(L + '|')) delete S.marks[k]; delete S.checked[L]; if (S.cloneRow === L) S.cloneRow = null; }
+      S.slotSig[slot] = sg;
+    }
+    S.sigSlot = slotOf;
+    S.extraGroups = big.filter(g => slotOf[g.sig] == null).length;
+    S.groups = big.filter(g => slotOf[g.sig] != null).map(g => { const k = major(g); return { slot: slotOf[g.sig], label: 'ABCDE'[slotOf[g.sig]], pop: P.pops[k], purity: g.by[k] / g.n, n: g.n }; }).sort((a, b) => a.slot - b.slot);
+    const slotByRaw = {};
+    for (const g of big) for (const m of g.members) if (slotOf[g.sig] != null) slotByRaw[m.sig] = slotOf[g.sig];
+    S.paint = sig.map(arr => arr.map(x => slotByRaw[x] != null ? slotByRaw[x] : -1));
+  }
+  /* The rows the player names: populations (labeled boards) or the player's groups (Hard). */
+  const rows = () => gating() ? S.groups.map(g => ({ label: g.label, slot: g.slot, pop: g.pop, purity: g.purity }))
+    : S.P.pops.map(p => ({ label: p.label, slot: p.slot, pop: p, purity: 1 }));
+  const rowTag = r => `${shapeIcon(r.slot)} <b>${r.label}</b>`;
+  const cloneRowObj = () => gating() ? rows().find(r => r.label === S.cloneRow) : { label: target().label, slot: target().slot, pop: target(), purity: 1 };
+
+  function plotOpts(i, size = 240) {
+    if (!gating()) return { size, focus: S.mode === 'clone' ? target().slot : S.focus };
+    const cr = S.mode === 'clone' ? cloneRowObj() : null;
+    const labels = 'ABCDE'.split('').map((l, slot) => S.groups.some(g => g.slot === slot) ? l : null);
+    return { size, focus: S.mode === 'clone' ? (cr ? cr.slot : null) : S.focus, labels: 'none', paint: S.paint, paintLabels: labels, gate: S.gates[i] };
+  }
   function drawPlots() {
-    const focus = S.mode === 'clone' ? target().slot : S.focus;
-    $('#plots').innerHTML = S.P.plots.map((pl, i) => `<figure data-plot="${i}" class="${S.flash === i ? 'flash' : ''}">${renderPlot(S.P, pl, { size: 240, focus })}<figcaption>${plotName(pl)}</figcaption></figure>`).join('');
+    $('#plots').innerHTML = S.P.plots.map((pl, i) => `<figure data-plot="${i}" class="${S.flash === i ? 'flash' : ''}">${renderPlot(S.P, pl, plotOpts(i))}<figcaption>${plotName(pl)}</figcaption></figure>`).join('');
     fitPlots();
   }
 
@@ -190,11 +268,13 @@
     const tally = `<span class="tally">${tallyText()}${prefs.autoCheck ? ' · auto-check on' : ''}</span>`;
     let h = '';
     if (S.mode === 'pops') {
-      h += `<p class="sub">Give each letter an identity; decoys are mixed in and none is used twice. Tap a cell: ruled out, then chosen, then blank. Tap a letter to highlight it in every plot; tap a column name to find it in the pad.</p>`;
+      h += gating()
+        ? `<p class="sub">No labels on Hard: drag each plot's gate (the crosshair; two side-scatter lines on FSC/SSC) and the events sort themselves into lettered groups across every plot. Get one clean group per population, then name each group.</p><p class="gstat">${plural(S.groups.length, 'group')}${S.extraGroups ? ` (+${S.extraGroups} too many to letter)` : ''} · this tube has ${P.pops.length} populations</p>`
+        : `<p class="sub">Give each letter an identity; decoys are mixed in and none is used twice. Tap a cell: ruled out, then chosen, then blank. Tap a letter to highlight it in every plot; tap a column name to find it in the pad.</p>`;
       h += `<table class="lgrid"><thead><tr><th></th>${P.pool.map(id => `<th><button class="colh" data-jump="${id}" title="${esc(BY[id].long)}">${esc(BY[id].name)}</button></th>`).join('')}</tr></thead><tbody>`;
-      for (const p of P.pops) {
+      for (const p of rows()) {
         const c = S.checked[p.label];
-        h += `<tr data-row="${p.label}" class="${S.focus === p.slot ? 'focus' : ''}"><th data-focus="${p.label}">${popTag(p)}${c ? `<span class="rowmark ${c}">${ICON[c]}${c}</span>` : ''}</th>`;
+        h += `<tr data-row="${p.label}" class="${S.focus === p.slot ? 'focus' : ''}"><th data-focus="${p.label}">${rowTag(p)}${c ? `<span class="rowmark ${c}">${ICON[c]}${c}</span>` : ''}</th>`;
         for (const id of P.pool) {
           const m = S.marks[p.label + '|' + id];
           h += `<td class="${m || ''}"><button data-cell="${p.label}|${id}" ${play ? '' : 'disabled'} aria-label="${p.label}, ${esc(BY[id].name)}: ${m ? MARK_WORD[m] : 'blank'}">${m ? ICON[m] : ''}</button></td>`;
@@ -202,11 +282,16 @@
         h += '</tr>';
       }
       h += '</tbody></table>';
-      const ready = P.pops.every(p => P.pool.some(id => S.marks[p.label + '|' + id] === 'yes'));
+      const ready = rows().length > 0 && rows().every(p => P.pool.some(id => S.marks[p.label + '|' + id] === 'yes'));
       if (play) h += `<div class="actions">${prefs.autoCheck ? '' : `<button class="btn primary" data-act="check" ${ready ? '' : 'disabled'}>Check</button>`}${tally}</div>`;
     } else {
-      const t = target();
-      h += `<p class="sub">Population ${popTag(t)} is abnormal; the rest of the tube is faded background. Strike out what the plots rule out, then choose. Tap a name: ruled out, then chosen, then blank.</p>`;
+      if (gating()) {
+        h += `<p class="sub">No labels on Hard: drag each plot's gate and the events sort themselves into lettered groups. Find the abnormal group, pick it, then diagnose it.</p>`;
+        h += `<div class="gpick"><span>Abnormal group:</span>${rows().map(r => `<button class="gchip" data-crow="${r.label}" aria-pressed="${S.cloneRow === r.label}" ${play ? '' : 'disabled'}>${rowTag(r)}</button>`).join('') || '<span class="muted">no groups yet</span>'}</div>`;
+      } else {
+        const t = target();
+        h += `<p class="sub">Population ${popTag(t)} is abnormal; the rest of the tube is faded background. Strike out what the plots rule out, then choose. Tap a name: ruled out, then chosen, then blank.</p>`;
+      }
       for (const id of P.pool) {
         const m = S.marks['dx|' + id], c = S.checked[id];
         h += `<div class="dxrow"><button class="dx ${m || ''}" data-dx="${id}" ${play ? '' : 'disabled'}>${m ? ICON[m] : '<span class="ic"></span>'}<span class="nm">${esc(BY[id].name)}</span>${c ? `<span class="rowmark ${c}">${ICON[c]}${c}</span>` : ''}</button><button class="padlink" data-jump="${id}">pad</button></div>`;
@@ -237,32 +322,52 @@
   function check() {
     const P = S.P;
     if (S.mode === 'pops') {
+      if (gating()) {
+        const gp = gateProblems();
+        if (gp.length) { S.wrongChecks++; S.msg = { kind: 'bad', html: `<b>Fix the gates first.</b><ul>${gp.map(x => `<li>${x}</li>`).join('')}</ul>` }; return drawPanel(); }
+      }
       const bad = [];
-      for (const p of P.pops) {
-        const id = P.pool.find(i => S.marks[p.label + '|' + i] === 'yes');
-        if (id === P.solution[p.label]) { S.checked[p.label] = 'right'; continue; }
-        S.checked[p.label] = 'wrong';
-        bad.push(`${popTag(p)} is not ${esc(BY[id].name)}: ${esc(wrongReason(id, p))}.`);
+      for (const r of rows()) {
+        const id = P.pool.find(i => S.marks[r.label + '|' + i] === 'yes');
+        if (id === r.pop.id) { S.checked[r.label] = 'right'; continue; }
+        S.checked[r.label] = 'wrong';
+        bad.push(`${rowTag(r)} is not ${esc(BY[id].name)}: ${esc(wrongReason(id, r.pop))}.`);
       }
       if (bad.length) { S.wrongChecks++; S.msg = { kind: 'bad', html: `<b>${bad.length} not right yet.</b><ul>${bad.map(b => `<li>${b}</li>`).join('')}</ul>` }; }
       else finishBoard();
     } else checkClone();
     drawPanel();
   }
+  /* Hard: are the gates good enough to name groups? */
+  function gateProblems() {
+    const out = [], rs = rows(), P = S.P;
+    if (S.extraGroups || rs.length > P.pops.length) out.push('There are more groups than populations: a gate is cutting through a cluster.');
+    for (const r of rs) if (r.purity < 0.85) out.push(`${rowTag(r)} mixes two populations: move a gate into the gap between them.`);
+    for (const p of P.pops) { const mine = rs.filter(r => r.pop === p && r.purity >= 0.85); if (mine.length > 1) out.push(`${mine.map(rowTag).join(' and ')} are one population split by a gate.`); }
+    if (!out.length && rs.length < P.pops.length) out.push('A population is hiding inside another group: some gate sits on the wrong side of a cluster.');
+    return out;
+  }
   function checkClone() {
     const t = target(), id = S.P.pool.find(i => S.marks['dx|' + i] === 'yes');
     if (!id) return;
+    if (gating()) {
+      const cr = cloneRowObj();
+      if (!cr) { S.msg = { kind: 'bad', html: '<b>Pick the abnormal group first.</b> Gate the tube until the clone has a letter of its own, then choose it above.' }; return; }
+      if (cr.pop !== t) { S.wrongChecks++; S.msg = { kind: 'bad', html: `<b>${rowTag(cr)} isn't the abnormal population.</b> Its markers fit a normal cell type; look for the group that doesn't.` }; return; }
+      if (cr.purity < 0.85) { S.wrongChecks++; S.msg = { kind: 'bad', html: `<b>${rowTag(cr)} mixes the clone with normal cells.</b> Tighten the gates around it first.` }; return; }
+    }
     if (id === t.id) { S.checked[id] = 'right'; finishBoard(); return; }
     S.wrongChecks++; S.checked[id] = 'wrong'; S.marks['dx|' + id] = 'no';
     S.msg = { kind: 'bad', html: `<b>Not ${esc(BY[id].name)}.</b> ${esc(wrongReason(id, t))}.` };
   }
   /* Auto-check: judge one row the moment an identity is chosen. */
   function autoCheckRow(row) {
-    const p = S.P.pops.find(q => q.label === row), id = S.P.pool.find(i => S.marks[row + '|' + i] === 'yes');
-    if (!id) return;
-    if (id === S.P.solution[row]) { S.checked[row] = 'right'; S.msg = null; }
-    else { S.checked[row] = 'wrong'; S.wrongChecks++; S.msg = { kind: 'bad', html: `${popTag(p)} is not ${esc(BY[id].name)}: ${esc(wrongReason(id, p))}.` }; }
-    if (S.P.pops.every(q => S.checked[q.label] === 'right')) finishBoard();
+    const r = rows().find(q => q.label === row), id = S.P.pool.find(i => S.marks[row + '|' + i] === 'yes');
+    if (!id || !r) return;
+    if (r.purity < 0.85) { S.checked[row] = 'wrong'; S.wrongChecks++; S.msg = { kind: 'bad', html: `${rowTag(r)} mixes two populations: move a gate into the gap first.` }; return; }
+    if (id === r.pop.id) { S.checked[row] = 'right'; S.msg = null; }
+    else { S.checked[row] = 'wrong'; S.wrongChecks++; S.msg = { kind: 'bad', html: `${rowTag(r)} is not ${esc(BY[id].name)}: ${esc(wrongReason(id, r.pop))}.` }; }
+    if (rows().every(q => S.checked[q.label] === 'right') && (!gating() || !gateProblems().length)) finishBoard();
   }
   function finishBoard() {
     S.msg = { kind: 'good', html: `<b>Solved.</b> ${S.mode === 'pops' ? 'Every population is right.' : 'That is the diagnosis.'}` };
@@ -294,10 +399,68 @@
     }
     return null;
   }
+  /* Hard: the first gate line that leaves more than 5% of a population on the wrong side (or cuts one),
+     and where it should go. A line's cost at v: for each population, the share of its events on the wrong side
+     (when its reading says which side) or the smaller share either side (when nothing says, as for the
+     side-scatter line on CD45/SSC); naturally split populations cost nothing. */
+  function badGate() {
+    const P = S.P;
+    for (const [i, pl] of P.plots.entries()) {
+      const gt = S.gates[i], [xm, ym] = axes(pl);
+      const lines = gt.y1 != null ? [['y1', 'SSC'], ['y2', 'SSC']] : [['x', xm], ['y', ym]];
+      for (const [k, mk] of lines) {
+        const cost = v => P.pops.map((p, pi) => {
+          if (naturallySplit(p, mk)) return 0;
+          const evs = P.events[pi], up = evs.filter(e => axisVal(e, mk) > v).length / evs.length, want = side(p, mk, k);
+          return want === 'above' ? 1 - up : want === 'below' ? up : Math.min(up, 1 - up);
+        });
+        const now = cost(gt[k]);
+        if (Math.max(...now) <= 0.05) continue;
+        const top = isScatter(mk) ? 1024 : 4, step = top / 160;
+        let best = gt[k], bc = Infinity;
+        for (let v = step; v < top; v += step) {
+          if (k === 'y1' && v >= gt.y2 - 20) break;
+          if (k === 'y2' && v <= gt.y1 + 20) continue;
+          const c = cost(v).reduce((a, b) => a + b, 0); if (c < bc - 1e-9) { bc = c; best = v; }
+        }
+        // only a line that can actually do better (populations that truly touch can't be split cleaner)
+        if (bc < now.reduce((a, b) => a + b, 0) - 0.02) return { i, k, mk, to: best, pl };
+      }
+    }
+    return null;
+  }
+  function side(p, mk, k) {
+    if (mk === 'SSC') { const c = BY[p.id].ssc; if (k === 'y1') return c === 'low' ? 'below' : 'above'; if (k === 'y2') return c === 'high' ? 'above' : 'below'; return null; }
+    if (mk === 'FSC') return null;
+    if (mk === 'LCk' || mk === 'LCl') return (mk === 'LCk' ? p.lc === 'kappa' : p.lc === 'lambda') ? 'above' : 'below';
+    const c = observed(p, mk); return c === 'neg' ? 'below' : 'above';
+  }
+  const lineName = (bg) => bg.k === 'y1' ? 'lower side-scatter line' : bg.k === 'y2' ? 'upper side-scatter line' : `${bg.mk === 'LCk' ? 'kappa' : bg.mk === 'LCl' ? 'lambda' : bg.mk} line`;
+
   function hint() {
     if (S.phase !== 'play') return;
     const P = S.P, mks = markersOf(shownPlots());
-    const rows = S.mode === 'pops' ? P.pops.map(p => ({ p, key: id => p.label + '|' + id, sol: P.solution[p.label] })) : [{ p: target(), key: id => 'dx|' + id, sol: target().id }];
+    if (gating()) {
+      const bg = badGate();
+      if (bg) {
+        S.gates[bg.i][bg.k] = bg.to; regroup();
+        S.hints++; S.msg = { kind: 'hint', html: `<b>Hint.</b> The ${lineName(bg)} on ${plotName(bg.pl)} cut through a population or left one on the wrong side. Moved it into the gap.` };
+        S.flash = bg.i; S.tab = 'answer'; S.sheet = 'open'; drawPlots(); drawPanel();
+        const m = document.querySelector('#panel .msg.hint'); if (m) m.scrollIntoView({ block: 'nearest' });
+        setTimeout(() => { S.flash = null; const f = document.querySelector('figure.flash'); if (f) f.classList.remove('flash'); }, 2600);
+        return;
+      }
+      if (S.mode === 'clone') {
+        const cr = cloneRowObj(), good = rows().find(r => r.pop === target());
+        if (good && (!cr || cr.label !== good.label)) {
+          S.cloneRow = good.label; S.hints++;
+          S.msg = { kind: 'hint', html: `<b>Hint.</b> ${rowTag(good)} is the abnormal group: no normal cell type in this tube reads that way. Picked it.` };
+          S.tab = 'answer'; S.sheet = 'open'; drawPlots(); drawPanel(); return;
+        }
+      }
+    }
+    const tc = S.mode === 'clone' ? cloneRowObj() : null;
+    const list = S.mode === 'pops' ? rowsForHint() : tc ? [{ p: tc.pop, r: tc, key: id => 'dx|' + id, sol: target().id }] : [];
     const say = (html, p, plot) => {
       S.hints++; S.msg = { kind: 'hint', html: `<b>Hint.</b> ${html}` };
       if (S.mode === 'pops' && p) S.focus = p.slot;
@@ -307,41 +470,42 @@
       const m = document.querySelector('#panel .msg.hint'); if (m) m.scrollIntoView({ block: 'nearest' });
       if (S.flash != null) setTimeout(() => { S.flash = null; const f = document.querySelector('figure.flash'); if (f) f.classList.remove('flash'); }, 2600);
     };
-    const who = p => S.mode === 'pops' ? `${popTag(p)}` : `The clone (${popTag(p)})`;
+    const who = (p, r) => S.mode === 'pops' ? rowTag(r) : `The clone (${rowTag(r)})`;
     // 1. mistakes
-    for (const { p, key, sol } of rows) {
+    for (const { p, r, key, sol } of list) {
       const bad = P.pool.find(id => S.marks[key(id)] === 'yes' && id !== sol);
-      if (bad) { delete S.marks[key(bad)]; delete S.checked[S.mode === 'pops' ? p.label : bad]; const c = firstContradiction(bad, p); return say(`${who(p)} is not ${esc(BY[bad].name)}: ${esc(c ? c.text : 'another population needs that identity')}. Cleared it.`, p, c && c.plot); }
-      if (S.marks[key(sol)] === 'no') { delete S.marks[key(sol)]; return say(`You crossed out the right identity for ${who(p)}. Restored that cell; look at its row again.`, p); }
+      if (bad) { delete S.marks[key(bad)]; delete S.checked[S.mode === 'pops' ? r.label : bad]; const c = firstContradiction(bad, p); return say(`${who(p, r)} is not ${esc(BY[bad].name)}: ${esc(c ? c.text : 'another population needs that identity')}. Cleared it.`, r, c && c.plot); }
+      if (S.marks[key(sol)] === 'no') { delete S.marks[key(sol)]; return say(`You crossed out the right identity for ${who(p, r)}. Restored that cell; look at its row again.`, r); }
     }
     // 2. a cross-out a plot proves
-    for (const { p, key, sol } of rows) {
+    for (const { p, r, key, sol } of list) {
       if (S.marks[key(sol)] === 'yes') continue;
       for (const id of P.pool) {
         if (S.marks[key(id)] || fits(id, p, mks)) continue;
         const c = firstContradiction(id, p);
         S.marks[key(id)] = 'no';
-        return say(`${who(p)} is not ${esc(BY[id].name)}: ${esc(c.text)}. Crossed it out.`, p, c.plot);
+        return say(`${who(p, r)} is not ${esc(BY[id].name)}: ${esc(c.text)}. Crossed it out.`, r, c.plot);
       }
     }
     // 3. the only identity left
-    for (const { p, key, sol } of rows) {
+    for (const { p, r, key, sol } of list) {
       if (S.marks[key(sol)] === 'yes') continue;
       const left = P.pool.filter(id => S.marks[key(id)] !== 'no');
-      if (left.length === 1 || S.mode === 'clone') return place(p, key, sol, `${esc(BY[sol].name)} is the only identity left that fits ${who(p)}.`, say);
+      if (left.length === 1 || S.mode === 'clone') return place(r, key, sol, `${esc(BY[sol].name)} is the only identity left that fits ${who(p, r)}.`, say);
     }
     // 4. cross-elimination: an identity that fits this letter belongs to another
     const cand = countSolutions(P.pops, P.pool, mks).cand;
-    for (const [i, { p, key, sol }] of rows.entries()) {
+    for (const { p, r, key, sol } of list) {
       if (S.marks[key(sol)] === 'yes') continue;
-      const other = cand[i].find(id => id !== sol && S.marks[key(id)] !== 'no');
+      const other = (cand[P.pops.indexOf(p)] || []).find(id => id !== sol && S.marks[key(id)] !== 'no');
       if (!other) continue;
-      const q = P.pops.find(x => P.solution[x.label] === other);
+      const q = list.find(x => x.p.id === other);
       S.marks[key(other)] = 'no';
-      return say(`${popTag(p)} fits ${esc(BY[other].name)} too, but ${popTag(q)} can only be ${esc(BY[other].name)} once its own decoys are out, and no identity is used twice. Crossed it out for ${p.label}.`, p);
+      return say(`${rowTag(r)} fits ${esc(BY[other].name)} too, but ${q ? rowTag(q.r) : 'another population'} can only be ${esc(BY[other].name)} once its own decoys are out, and no identity is used twice. Crossed it out for ${r.label}.`, r);
     }
     S.msg = { kind: 'hint', html: '<b>Hint.</b> Everything is placed. Press Check.' }; drawPanel();
   }
+  const rowsForHint = () => rows().map(r => ({ p: r.pop, r, key: id => r.label + '|' + id, sol: r.pop.id }));
   function place(p, key, sol, text, say) {
     for (const k of Object.keys(S.marks)) {
       const [r2, i2] = k.split('|');
@@ -361,7 +525,7 @@
     for (const p of pops) {
       const e = BY[p.id];
       const lc = p.lc === 'kappa' || p.lc === 'lambda' ? ` (${p.lc} restricted)` : '';
-      h += `<div class="item">${popTag(p)} ${esc(e.long)}${lc} · ${Math.round(p.frac * 100)}% of events<div class="why">${esc(e.teach)}</div></div>`;
+      h += `<div class="item">${gating() ? '' : popTag(p) + ' '}${esc(e.long)}${lc} · ${Math.round(p.frac * 100)}% of events<div class="why">${esc(e.teach)}</div></div>`;
     }
     const decoys = S.mode === 'clone' ? P.pool.filter(id => id !== target().id) : P.pool.filter(id => !P.pops.some(p => p.id === id));
     if (decoys.length) {
@@ -370,7 +534,7 @@
         const cands = S.mode === 'clone' ? [target()] : P.pops;
         let best = null;
         for (const p of cands) { const r = why(d, p, plots); if (!best || r.length < best.r.length) best = { p, r }; }
-        h += `<div class="item">${esc(BY[d].name)}<div class="why">Closest to ${best.p.label}, but ${esc(best.r[0] || 'its letter was taken by a better fit')}.</div></div>`;
+        h += `<div class="item">${esc(BY[d].name)}<div class="why">Closest to ${gating() ? 'the ' + esc(BY[best.p.id].name.toLowerCase()) : best.p.label}, but ${esc(best.r[0] || 'its letter was taken by a better fit')}.</div></div>`;
       }
     }
     const herring = plots.find(p => p.role === 'herring');
@@ -396,7 +560,9 @@
     const rv = ev.target.closest('[data-reveal]');
     if (rv) { S.peeks.add(rv.dataset.reveal); S.padRow = rv.dataset.reveal; return drawPanel(); }
     const fc = ev.target.closest('[data-focus]');
-    if (fc) { const slot = S.P.pops.find(p => p.label === fc.dataset.focus).slot; S.focus = S.focus === slot ? null : slot; drawPlots(); return drawPanel(); }
+    if (fc) { const slot = rows().find(p => p.label === fc.dataset.focus).slot; S.focus = S.focus === slot ? null : slot; drawPlots(); return drawPanel(); }
+    const crw = ev.target.closest('[data-crow]');
+    if (crw) { S.cloneRow = S.cloneRow === crw.dataset.crow ? null : crw.dataset.crow; S.msg = null; drawPlots(); return drawPanel(); }
     const cell = ev.target.closest('[data-cell]');
     if (cell) {
       const [row, id] = cell.dataset.cell.split('|'), key = row + '|' + id, next = cycle(S.marks[key]);
@@ -429,31 +595,70 @@
   $('#panel').addEventListener('mouseover', ev => {
     if (!S || S.mode !== 'pops' || !matchMedia('(hover: hover)').matches) return;
     const tr = ev.target.closest('tr[data-row]');
-    const slot = tr ? S.P.pops.find(p => p.label === tr.dataset.row).slot : null;
+    const row = tr && rows().find(p => p.label === tr.dataset.row), slot = row ? row.slot : null;
     if (slot !== S.focus) { S.focus = slot; drawPlots(); $('#panel').querySelectorAll('tr[data-row]').forEach(r => r.classList.toggle('focus', tr === r)); }
   });
   $('#panel').addEventListener('mouseleave', () => { if (S && matchMedia('(hover: hover)').matches && S.focus != null) { S.focus = null; drawPlots(); } });
 
-  // ---------- enlarge a plot: tap, or press and hold (Settings) ----------
+  // ---------- enlarge a plot: tap, or press and hold (Settings); on Hard, drag gates ----------
   const zoom = $('#zoom');
+  let zoomI = null, zoomAt = 0;
   function openZoom(i) {
-    const pl = S.P.plots[i], size = Math.floor(Math.min(innerWidth - 24, innerHeight - 90, 640));
-    zoom.innerHTML = `<figure>${renderPlot(S.P, pl, { size: 240, focus: S.mode === 'clone' ? target().slot : S.focus })}<figcaption>${plotName(pl)}${prefs.enlarge === 'tap' ? ' · tap to close' : ''}</figcaption></figure>`;
+    zoomI = i; zoomAt = performance.now();
+    const pl = S.P.plots[i], size = Math.floor(Math.min(innerWidth - 24, innerHeight - (gating() ? 130 : 90), 640));
+    const tail = gating() ? `<div class="zoom-foot"><span>Drag anywhere to move the gate</span><button class="btn primary" data-done>Done</button></div>` : '';
+    zoom.innerHTML = `<figure data-zplot="${i}">${renderPlot(S.P, pl, plotOpts(i))}<figcaption>${plotName(pl)}${!gating() && prefs.enlarge === 'tap' ? ' · tap to close' : ''}</figcaption>${tail}</figure>`;
     zoom.style.setProperty('--zoom', size + 'px');
     zoom.hidden = false;
   }
-  const closeZoom = () => { zoom.hidden = true; zoom.innerHTML = ''; };
-  let holdTimer = null, held = false;
+  const closeZoom = () => { zoom.hidden = true; zoom.innerHTML = ''; zoomI = null; };
+  let holdTimer = null, held = false, drag = null, frame = 0;
+  // Pointer position -> gate, in the plot's own data units.
+  function moveGate(d, ev) {
+    const svg = d.zoom ? zoom.querySelector('svg') : document.querySelector(`#plots [data-plot="${d.i}"] svg`);
+    if (!svg) return;
+    const rc = svg.getBoundingClientRect(), g = geom(S.P.plots[d.i]);
+    const vx = (ev.clientX - rc.left) / rc.width * g.S, vy = (ev.clientY - rc.top) / rc.height * g.S;
+    const gt = S.gates[d.i];
+    if (gt.y1 != null) {
+      const y = g.dy(vy);
+      if (!d.line) d.line = Math.abs(y - gt.y1) < Math.abs(y - gt.y2) ? 'y1' : 'y2';
+      if (d.line === 'y1') gt.y1 = Math.min(y, gt.y2 - 20); else gt.y2 = Math.max(y, gt.y1 + 20);
+    } else { gt.x = g.dx(vx); gt.y = g.dy(vy); }
+    if (!frame) frame = requestAnimationFrame(() => {
+      frame = 0; regroup(); drawPlots();
+      if (zoomI != null) { const f = zoom.querySelector('figure'); if (f) f.firstElementChild.outerHTML = renderPlot(S.P, S.P.plots[zoomI], plotOpts(zoomI)); }
+      drawPanel();
+    });
+  }
   $('#plots').addEventListener('pointerdown', ev => {
-    const f = ev.target.closest('[data-plot]'); if (!f || prefs.enlarge !== 'hold') return;
+    const f = ev.target.closest('[data-plot]'); if (!f || !S) return;
+    if (gating() && S.phase === 'play') { drag = { i: +f.dataset.plot, x0: ev.clientX, y0: ev.clientY, moved: false }; $('#plots').setPointerCapture(ev.pointerId); return; }
+    if (prefs.enlarge !== 'hold') return;
     held = false;
     holdTimer = setTimeout(() => { held = true; openZoom(+f.dataset.plot); }, 220);
   });
+  $('#plots').addEventListener('pointermove', ev => {
+    if (!drag || drag.zoom) return;
+    if (!drag.moved && Math.hypot(ev.clientX - drag.x0, ev.clientY - drag.y0) < 6) return;
+    drag.moved = true; moveGate(drag, ev);
+  });
+  $('#plots').addEventListener('pointerup', () => { if (!drag || drag.zoom) return; const d = drag; drag = null; if (!d.moved) openZoom(d.i); });
+  zoom.addEventListener('pointerdown', ev => {
+    if (!gating() || zoomI == null || !ev.target.closest('svg') || S.phase !== 'play') return;
+    drag = { i: zoomI, zoom: true, moved: true }; zoom.setPointerCapture(ev.pointerId); moveGate(drag, ev);
+  });
+  zoom.addEventListener('pointermove', ev => { if (drag && drag.zoom) moveGate(drag, ev); });
+  zoom.addEventListener('pointerup', () => { if (drag && drag.zoom) drag = null; });
   const release = () => { clearTimeout(holdTimer); if (held) { held = false; closeZoom(); } };
   addEventListener('pointerup', release); addEventListener('pointercancel', release);
-  $('#plots').addEventListener('click', ev => { const f = ev.target.closest('[data-plot]'); if (f && prefs.enlarge === 'tap') openZoom(+f.dataset.plot); });
+  $('#plots').addEventListener('click', ev => { const f = ev.target.closest('[data-plot]'); if (f && !gating() && prefs.enlarge === 'tap') openZoom(+f.dataset.plot); });
   $('#plots').addEventListener('contextmenu', ev => ev.preventDefault());
-  zoom.addEventListener('click', () => { if (prefs.enlarge === 'tap') closeZoom(); });
+  zoom.addEventListener('click', ev => {
+    if (ev.target.closest('[data-done]')) return closeZoom();
+    if (performance.now() - zoomAt < 400) return; // a touch's own follow-up click lands on the new overlay
+    if (gating() ? !ev.target.closest('figure') : prefs.enlarge === 'tap') closeZoom();
+  });
   addEventListener('keydown', ev => { if (ev.key === 'Escape' && !zoom.hidden) closeZoom(); });
 
   // ---------- settings ----------
@@ -499,6 +704,7 @@
   $('#setBtn').addEventListener('click', openSettings);
   addEventListener('resize', () => { if (S) fitPlots(); });
   addEventListener('hashchange', route);
+  FC.state = () => S; // for tests and the console
   applyTheme();
   route();
 })();

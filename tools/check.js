@@ -20,6 +20,7 @@ for (const mode of ['pops', 'clone']) for (const level of Object.keys(G.LEVELS))
       const informs = p.plots.slice(1).filter(q => p.pool.some(id => id !== target.id && !G.fits(id, target, G.plotMarkers([q.x, q.y])))).length;
       if (informs < G.LEVELS[level].cloneMin) { bad++; console.log('✗ too few marker plots', level, p.seed, informs); }
     }
+    if (G.LEVELS[level].gating && G.collisions(p.pops, plots)) { bad++; console.log('✗ not gate-separable', mode, level, p.seed); }
     if (p.pct && !p.pct.options.includes(p.pct.answer)) { bad++; console.log('✗ pct', p.seed); }
     stats.plots += p.plots.length; stats.matching += p.needsMatching;
     for (const pop of p.pops) if (BY[pop.id].kind === 'neoplasm') stats.clones[pop.id] = (stats.clones[pop.id] || 0) + 1;

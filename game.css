@@ -162,3 +162,11 @@
   .lgrid .colh { max-height: none; font-size: 10px; padding: 2px 1px; }
   .lgrid td { width: 30px; height: 30px; }
 }
+
+/* ---------- Hard: player-placed gates ---------- */
+.gstat { font-size: var(--fs-sm); font-weight: 700; margin: 0 0 10px; }
+.gpick { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 0 0 12px; font-size: var(--fs-sm); font-weight: 700; }
+.gchip { display: inline-flex; gap: 4px; align-items: center; border: 1.5px solid var(--line); background: var(--card); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+.gchip[aria-pressed="true"] { border: 3px solid var(--blue); background: var(--blue-bg); }
+.game.gating .plots figure, .zoom svg { touch-action: none; cursor: crosshair; }
+.zoom-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 8px; font-size: var(--fs-sm); color: var(--muted); font-weight: 600; }

@@ -71,7 +71,7 @@
   const LEVELS = {
     easy: { label: 'Easy', spread: 1, pops: 3, decoys: 2, dx: 3, clone: 0.7, extra: 2, herring: 0, pct: false, wantMatching: false },
     medium: { label: 'Medium', spread: 1.18, pops: 4, decoys: 3, dx: 4, cloneMin: 2, clone: 1, extra: 0, herring: 0, pct: false, wantMatching: true },
-    hard: { label: 'Hard', spread: 1.32, pops: 5, decoys: 4, dx: 5, cloneMin: 2, clone: 1, extra: 0, herring: 1, pct: true, wantMatching: true },
+    hard: { label: 'Hard', spread: 1.45, gating: true, pops: 5, decoys: 4, dx: 5, cloneMin: 2, clone: 1, extra: 0, herring: 1, pct: true, wantMatching: true },
   };
 
   const ALL_MARKERS = markersOf(PLOTS);
@@ -154,6 +154,18 @@
         if (allNeg && lures) herrings.push(p);
       }
 
+      // Hard boards are gated by the player, so every pair of populations must be separable by quad
+      // gates on the plots shown. If two can't be told apart, add the plot that splits them.
+      if (cfg.gating) {
+        let all = [...shown, ...extras, ...herrings], guard = 0;
+        while (collisions(pops, all) && guard++ < 6) {
+          const fix = unused.filter(p => !all.includes(p)).map(p => ({ p, c: collisions(pops, [...all, p]) })).sort((a, b) => a.c - b.c)[0];
+          if (!fix || fix.c >= collisions(pops, all)) break;
+          extras.push(fix.p); all = [...all, fix.p];
+        }
+        if (collisions(pops, all)) continue;
+      }
+
       // Population sizes: the clone is big, normals share the rest.
       const w = pops.map(p => BY[p.id].kind === 'neoplasm' ? 2 + r() * 4 : 0.6 + r() * 1.6);
       const tot = w.reduce((a, b) => a + b, 0);
@@ -180,6 +192,28 @@
       return puzzle;
     }
     throw new Error('could not build a board for seed ' + seed);
+  }
+
+  /* What quad gates can see of a population: one string per combination of its readings on the
+     plots (a naturally split marker or polyclonal light chains give both). Dim counts as positive,
+     as a single gate line does. */
+  function gateSigs(pop, plots) {
+    let out = [''];
+    const add = opts => { out = out.flatMap(s => opts.map(o => s + o + '.')); };
+    add([BY[pop.id].ssc]);
+    for (const p of plots) for (const mk of plotMarkers(p)) {
+      if (mk === 'SSC' || mk === 'FSC') continue;
+      if (mk === 'LC') { add(pop.lc === 'poly' ? ['kappa', 'lambda'] : [pop.lc]); continue; }
+      const c = observed(pop, mk);
+      add(c === 'split' ? ['n', 'p'] : c === 'neg' ? ['n'] : ['p']);
+    }
+    return out;
+  }
+  function collisions(pops, plots) {
+    const sigs = pops.map(p => new Set(gateSigs(p, plots)));
+    let n = 0;
+    for (let i = 0; i < pops.length; i++) for (let j = i + 1; j < pops.length; j++) if ([...sigs[i]].some(x => sigs[j].has(x))) n++;
+    return n;
   }
 
   // ---------- events ----------
@@ -240,6 +274,6 @@
     return mk + { neg: '−', pos: '+', dim: ' dim', split: ' partly +' }[cls];
   }
 
-  const API = { generate, countSolutions, fits, allowed, observed, markersOf, plotMarkers, why, describe, LEVELS, mulberry32 };
+  const API = { generate, collisions, countSolutions, fits, allowed, observed, markersOf, plotMarkers, why, describe, LEVELS, mulberry32 };
   if (typeof module !== 'undefined') module.exports = API; else window.FC = Object.assign(window.FC || {}, API);
 })();
