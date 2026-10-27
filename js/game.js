@@ -14,6 +14,7 @@
   const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 
   const ICON = {
+    hold: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.6" fill="currentColor"/><circle cx="8" cy="8" r="5.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2.2 2"/></svg>',
     no: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="var(--ink-2)" stroke-width="2.2" stroke-linecap="round"/></svg>',
     yes: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5" fill="var(--blue)" stroke="var(--ink)" stroke-width="1"/></svg>',
     right: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 5" fill="none" stroke="var(--teal)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
@@ -1026,7 +1027,11 @@
     pushUndo(); checkDx(id); drawPanel(); drawPlots();
   });
   $('#panel').addEventListener('click', ev => {
-    if (ev.target.closest('#refBtn')) { if (prefs.refOpen === 'tap' || !refFilled()) openRef(); return; }
+    if (ev.target.closest('#refBtn')) {
+      if (prefs.refOpen === 'tap' || !refFilled()) openRef();
+      else if (!refIsOpen() && performance.now() - refAt < 400) holdTip($('#refBtn'), 'Press and hold to see the Reference.'); // a quick tap opened and shut it
+      return;
+    }
     const ch = ev.target.closest('[data-colh]');
     if (ch) { if (choosing() && S.phase === 'play') return openActions('col', ch.dataset.colh); if (ch.dataset.colh !== 'abn') return openRef(ch.dataset.colh); return; }
     const fc = ev.target.closest('[data-focus]');
@@ -1154,9 +1159,14 @@
     // gated: a mouse drags gates in place; a finger swipes the strip, and a tap opens the plot to drag in
     if (gating()) { drag = { i: +f.dataset.plot, x0: ev.clientX, y0: ev.clientY, moved: false, touch: ev.pointerType === 'touch' }; if (!drag.touch) $('#plots').setPointerCapture(ev.pointerId); return; }
     if (prefs.enlarge !== 'hold') return;
-    held = false;
-    holdTimer = setTimeout(() => { held = true; openZoom(+f.dataset.plot); startHold('plot'); }, 220);
+    held = false; tapPlot = { f, x: ev.clientX, y: ev.clientY };
+    holdTimer = setTimeout(() => { held = true; tapPlot = null; openZoom(+f.dataset.plot); startHold('plot'); }, 220);
   });
+  // a quick tap on a plot (no hold, no swipe) gets a reminder
+  let tapPlot = null;
+  $('#plots').addEventListener('pointermove', ev => { if (tapPlot && Math.hypot(ev.clientX - tapPlot.x, ev.clientY - tapPlot.y) > 10) tapPlot = null; });
+  $('#plots').addEventListener('pointercancel', () => { tapPlot = null; });
+  $('#plots').addEventListener('pointerup', () => { if (tapPlot && !gating() && prefs.enlarge === 'hold') holdTip(tapPlot.f, 'Press and hold a plot to see it large.'); tapPlot = null; });
   $('#plots').addEventListener('pointermove', ev => {
     if (!drag || drag.zoom || !gatesLive()) return;
     if (drag.touch) { if (Math.hypot(ev.clientX - drag.x0, ev.clientY - drag.y0) > 10) drag.moved = true; return; }
@@ -1188,6 +1198,21 @@
     if (gatesLive() ? !ev.target.closest('figure') : (prefs.enlarge === 'tap' || gating() || zoomLatched)) closeZoom();
   });
   addEventListener('keydown', ev => { if (ev.key !== 'Escape') return; if (!zoom.hidden) closeZoom(); else if (refIsOpen()) closeRef(); });
+
+  /* Reminder for a press-and-hold target that was only tapped: a bubble over it for a few seconds. */
+  let tipTimer = 0;
+  function holdTip(target, text) {
+    let tip = $('#holdtip');
+    if (!tip) { tip = document.createElement('div'); tip.id = 'holdtip'; tip.className = 'holdtip'; tip.setAttribute('role', 'status'); document.body.append(tip); }
+    tip.innerHTML = `${ICON.hold}<span><b>${esc(text)}</b><span>Or make it a tap in Settings.</span></span>`;
+    tip.hidden = false;
+    const r = target.getBoundingClientRect(), w = Math.min(320, innerWidth - 24);
+    const left = Math.max(12, Math.min(innerWidth - w - 12, r.left + r.width / 2 - w / 2));
+    Object.assign(tip.style, { width: w + 'px', left: left + 'px', top: '', bottom: '' });
+    const above = r.top - 8 - tip.offsetHeight;
+    if (above > 60) tip.style.top = above + 'px'; else tip.style.top = (r.bottom + 8) + 'px';
+    clearTimeout(tipTimer); tipTimer = setTimeout(() => { tip.hidden = true; }, 2600);
+  }
 
   // ---------- settings ----------
   const dlg = $('#settings');

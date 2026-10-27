@@ -471,3 +471,11 @@ html.holdmode .plots figure { touch-action: pan-x; } /* the strip still swipes s
 /* no double-tap zoom anywhere (fast taps on grid cells used to zoom the page) */
 html, body { touch-action: manipulation; }
 .refpane .sub { padding-right: 40px; } /* clear of the floating close button */
+/* reminder when a press-and-hold target is only tapped */
+.holdtip { position: fixed; z-index: 45; display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: var(--card); color: var(--ink); border: 2px solid var(--orange); box-shadow: 0 10px 26px -10px rgba(10,12,16,.5); pointer-events: none; animation: tip-in .16s ease-out; }
+.holdtip[hidden] { display: none; }
+.holdtip > .ic { flex: none; width: 22px; height: 22px; color: var(--orange); margin-top: 1px; }
+.holdtip b { display: block; font-size: var(--fs-sm); }
+.holdtip span span { display: block; font-size: var(--fs-xs); color: var(--muted); margin-top: 2px; }
+@keyframes tip-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .holdtip { animation: none; } }
