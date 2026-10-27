@@ -21,7 +21,9 @@
     close: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
     eye: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8z" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="8" r="2.1" fill="currentColor"/></svg>',
     book: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 3.2c2-.9 3.8-.9 5.5.3 1.7-1.2 3.5-1.2 5.5-.3v9.6c-2-.9-3.8-.9-5.5.3-1.7-1.2-3.5-1.2-5.5-.3zM8 3.5v9.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
-    gear: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 5.6a2.4 2.4 0 1 0 0 4.8 2.4 2.4 0 0 0 0-4.8z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
+    gear: `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><path fill-rule="evenodd" d="M12 5.6a6.4 6.4 0 1 1 0 12.8 6.4 6.4 0 0 1 0-12.8zm0 3.6a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6z"/>${[0, 45, 90, 135, 180, 225, 270, 315].map(a => `<rect x="10.4" y="2" width="3.2" height="5" rx="1" transform="rotate(${a} 12 12)"/>`).join('')}</g></svg>`,
+    lock: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="currentColor"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" stroke="currentColor" stroke-width="2.2"/></svg>',
+    unlock: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="currentColor"/><path d="M8 10.5V8a4 4 0 0 1 7.6-1.7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
     plus: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
     next: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   };
@@ -72,6 +74,8 @@
     const a = prefs.appearance, dark = a.mode === 'dark' || (a.mode === 'auto' && !!(darkScheme && darkScheme.matches));
     document.documentElement.setAttribute('data-theme', dark ? a.dark : a.light);
     document.documentElement.style.setProperty('--gs', prefs.gscale);
+    // press-and-hold anywhere: no text selection or iOS callout to fight the long press
+    document.documentElement.classList.toggle('holdmode', prefs.enlarge === 'hold' || prefs.refOpen === 'hold');
     syncStatusBar();
   }
   /* iOS paints the status bar (and Android the browser bar) in theme-color. Match it to whatever sits
@@ -119,10 +123,10 @@
     h += '<div class="tiles">';
     for (const [l, L] of Object.entries(LEVELS)) {
       const sv = stats[l];
-      h += `<button class="card tile" data-play="${l}"><b>${L.label}</b><span class="tnote">${LEVEL_NOTES[l]}</span><span class="tstat">${sv ? `${sv.solved} solved` : 'new'}${prefs.timer && sv && sv.best ? ` · best ${fmtTime(sv.best)}` : ''}</span></button>`;
+      h += `<button class="card tile" data-play="${l}"><b>${L.label}</b><span class="tnote">${LEVEL_NOTES[l]}</span><span class="tstat">${sv ? `${sv.solved} solved${prefs.timer && sv.best ? ` · best ${fmtTime(sv.best)}` : ''}` : ''}</span></button>`;
     }
     const sc = stats.custom;
-    h += `<button class="card tile custom" data-custom><b>Custom</b><span class="tnote">Choose every setting, including the scratchpad and the diagnosis.</span><span class="tstat">${sc ? `${sc.solved} solved` : 'set it up'}</span></button>`;
+    h += `<button class="card tile custom" data-custom><b>Custom</b><span class="tnote">Choose every setting, including the scratchpad and the diagnosis.</span><span class="tstat">${sc ? `${sc.solved} solved` : ''}</span></button>`;
     h += '</div></main>';
     $('#menu').innerHTML = h;
     syncStatusBar();
@@ -386,7 +390,7 @@
   const padFilled = id => refFilled() || S.peeks.has(id);
   function refHTML() {
     const mks = markersOf(shownPlots()), ro = refFilled(), left = S.refs.filter(id => !S.peeks.has(id)).length;
-    let h = `<div class="ref-head"><h2>${ICON.book} Reference</h2><button class="iconbtn" data-refclose aria-label="Close">${ICON.close}</button></div>`;
+    let h = `<div class="ref-head"><h2>${ICON.book} Reference</h2>${refHeld ? '<span class="help">let go to close</span>' : `<button class="iconbtn" data-refclose aria-label="Close">${ICON.close}</button>`}</div>`;
     h += `<p class="sub">${ro ? 'Each cell type, read on the markers these plots show.' : 'Fill in each cell type\'s markers from memory: tap a cell to cycle its value. The eye fills a row from the key and counts as a peek; anything you had wrong gets a wavy underline.'}</p>`;
     if (!S.refs.length) h += `<p class="empty">No cell types yet. Add the ones you want to look up${choosing() ? '; normal cell types join the scratchpad too' : ''}.</p>`;
     else {
@@ -411,17 +415,53 @@
     h += `<div class="ref-foot">${addSelect('data-addref', 'Add a cell type', S.refs, false)}${!ro && left ? `<button class="btn" data-fill>Fill in from the key (${plural(left, 'peek')})</button>` : ''}</div>`;
     return h + '<p class="help">± partly positive, or varies by patient · κ/λ: 1 = one light chain (clonal), 2 = both, − = none · SSC lo / mid / hi.</p>';
   }
+  /* The reference opens over the answer panel only, so the plots stay in view (and tappable). */
   const refPane = $('#refpane');
   const refIsOpen = () => !refPane.hidden;
   let refHeld = false, refAt = 0;
-  function drawRef() { refPane.innerHTML = `<div class="refpane-in card">${refHTML()}</div>`; fitGrid(refPane.querySelector('.pad'), refPane.querySelector('.gridwrap')); }
+  function placeRef() {
+    const r = $('#panel').getBoundingClientRect();
+    Object.assign(refPane.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
+  }
+  function drawRef() {
+    refPane.innerHTML = `<div class="refpane-in card">${refHTML()}</div>`;
+    refPane.classList.toggle('held', refHeld);
+    fitGrid(refPane.querySelector('.pad'), refPane.querySelector('.gridwrap'));
+  }
   function openRef(row) {
     if (!S) return;
     if (row) { S.refRow = row; addTo(S.refs, row); }
-    drawRef(); refPane.hidden = false; refAt = performance.now();
+    placeRef(); drawRef(); refPane.hidden = false; refAt = performance.now();
     const r = row && refPane.querySelector(`[data-padrow="${row}"]`); if (r) r.scrollIntoView({ block: 'nearest' });
   }
   function closeRef(silent) { refPane.hidden = true; refPane.innerHTML = ''; refHeld = false; if (!silent && S) drawPanel(); }
+
+  /* Latch: while a plot or the reference is held open, a lock target appears; slide onto it and the
+     view stays open after you let go (as if you'd tapped it). */
+  const latchEl = $('#latch');
+  let holdKind = null, latched = false;
+  function startHold(kind) {
+    holdKind = kind; latched = false;
+    latchEl.innerHTML = `${ICON.unlock}<span>Slide here to keep it open</span>`;
+    latchEl.classList.remove('on'); latchEl.hidden = false;
+  }
+  function overLatch(ev) {
+    const r = latchEl.getBoundingClientRect(), m = 14;
+    return ev.clientX > r.left - m && ev.clientX < r.right + m && ev.clientY > r.top - m && ev.clientY < r.bottom + m;
+  }
+  addEventListener('pointermove', ev => {
+    if (!holdKind || latched || latchEl.hidden || !overLatch(ev)) return;
+    latched = true; latchEl.classList.add('on'); latchEl.innerHTML = `${ICON.lock}<span>Kept open</span>`;
+    if (navigator.vibrate) navigator.vibrate(10);
+  });
+  // Ends a hold: closes the view, unless it was latched (then it behaves as if opened by a tap).
+  function endHold() {
+    if (!holdKind) return;
+    const kind = holdKind, keep = latched;
+    holdKind = null; latchEl.hidden = true;
+    if (kind === 'ref') { refHeld = false; if (keep) { refAt = performance.now(); drawRef(); } else closeRef(); }
+    if (kind === 'plot') { held = false; if (keep) { zoomLatched = true; zoomAt = performance.now(); if (zoomI != null) openZoom(zoomI); } else closeZoom(); }
+  }
   function fillReference() {
     if (refFilled()) return;
     for (const id of S.refs) S.peeks.add(id);
@@ -928,10 +968,8 @@
   // Reference button, press-and-hold: shows the read-only reference while the finger is down.
   $('#panel').addEventListener('pointerdown', ev => {
     if (!ev.target.closest('#refBtn') || !S || prefs.refOpen !== 'hold' || !refFilled()) return;
-    refHeld = true; openRef();
+    refHeld = true; openRef(); startHold('ref');
   });
-  addEventListener('pointerup', () => { if (refHeld) { refHeld = false; closeRef(); } });
-  addEventListener('pointercancel', () => { if (refHeld) { refHeld = false; closeRef(); } });
   // Pointing at a row (mouse) highlights that population in every plot.
   $('#panel').addEventListener('mouseover', ev => {
     if (!S || S.phase !== 'play' || !matchMedia('(hover: hover)').matches) return;
@@ -944,7 +982,6 @@
   // reference pane input
   refPane.addEventListener('click', ev => {
     if (ev.target.closest('[data-refclose]')) return closeRef();
-    if (ev.target === refPane) { if (performance.now() - refAt > 400) closeRef(); return; }
     const pc = ev.target.closest('[data-pad]');
     if (pc) {
       pushUndo();
@@ -964,17 +1001,17 @@
 
   // ---------- enlarge a plot: tap, or press and hold (Settings); on gated boards, place and drag gates ----------
   const zoom = $('#zoom');
-  let zoomI = null, zoomAt = 0;
+  let zoomI = null, zoomAt = 0, zoomLatched = false;
   const gatesLive = () => gating() && (S.phase === 'play' || (S.phase === 'dx' && !S.cfg.scratch));
   function openZoom(i) {
     zoomI = i; zoomAt = performance.now();
     const pl = S.P.plots[i], size = Math.floor(Math.min(innerWidth - 24, innerHeight - (gatesLive() ? 130 : 90), 640));
     const tail = gatesLive() ? `<div class="zoom-foot"><span>${S.gates[i] ? 'Drag to move the gate' : 'Drag to place a gate'}${isFscSsc(pl) ? ' (two side-scatter lines)' : ''}</span><button class="btn primary" data-done>Done</button></div>` : '';
-    zoom.innerHTML = `<figure data-zplot="${i}">${renderPlot(S.P, pl, plotOpts(i, true))}<figcaption>${plotName(pl)}${!gatesLive() && (prefs.enlarge === 'tap' || gating()) ? ' · tap to close' : ''}</figcaption>${tail}</figure>`;
+    zoom.innerHTML = `<figure data-zplot="${i}">${renderPlot(S.P, pl, plotOpts(i, true))}<figcaption>${plotName(pl)}${!gatesLive() && (prefs.enlarge === 'tap' || gating() || zoomLatched) ? ' · tap to close' : held ? ' · let go to close' : ''}</figcaption>${tail}</figure>`;
     zoom.style.setProperty('--zoom', size + 'px');
     zoom.hidden = false;
   }
-  const closeZoom = () => { zoom.hidden = true; zoom.innerHTML = ''; zoomI = null; };
+  const closeZoom = () => { zoom.hidden = true; zoom.innerHTML = ''; zoomI = null; zoomLatched = false; };
   let holdTimer = null, held = false, drag = null, frame = 0;
   /* Pointer position -> gate, in the plot's own data units. A plot with no gate gets one where you
      press. On FSC/SSC the first line goes where you press; pressing well away from it adds the second;
@@ -1006,7 +1043,7 @@
     if (gating()) { drag = { i: +f.dataset.plot, x0: ev.clientX, y0: ev.clientY, moved: false }; $('#plots').setPointerCapture(ev.pointerId); return; }
     if (prefs.enlarge !== 'hold') return;
     held = false;
-    holdTimer = setTimeout(() => { held = true; openZoom(+f.dataset.plot); }, 220);
+    holdTimer = setTimeout(() => { held = true; openZoom(+f.dataset.plot); startHold('plot'); }, 220);
   });
   $('#plots').addEventListener('pointermove', ev => {
     if (!drag || drag.zoom || !gatesLive()) return;
@@ -1021,14 +1058,14 @@
   });
   zoom.addEventListener('pointermove', ev => { if (drag && drag.zoom) moveGate(drag, ev); });
   zoom.addEventListener('pointerup', () => { if (drag && drag.zoom) { drag = null; if (zoomI != null) openZoom(zoomI); } });
-  const release = () => { clearTimeout(holdTimer); if (held) { held = false; closeZoom(); } };
+  const release = () => { clearTimeout(holdTimer); if (holdKind) endHold(); else if (held) { held = false; closeZoom(); } };
   addEventListener('pointerup', release); addEventListener('pointercancel', release);
   $('#plots').addEventListener('click', ev => { const f = ev.target.closest('[data-plot]'); if (f && !gating() && prefs.enlarge === 'tap') openZoom(+f.dataset.plot); });
   $('#plots').addEventListener('contextmenu', ev => ev.preventDefault());
   zoom.addEventListener('click', ev => {
     if (ev.target.closest('[data-done]')) return closeZoom();
     if (performance.now() - zoomAt < 400) return; // a touch's own follow-up click lands on the new overlay
-    if (gatesLive() ? !ev.target.closest('figure') : (prefs.enlarge === 'tap' || gating())) closeZoom();
+    if (gatesLive() ? !ev.target.closest('figure') : (prefs.enlarge === 'tap' || gating() || zoomLatched)) closeZoom();
   });
   addEventListener('keydown', ev => { if (ev.key !== 'Escape') return; if (!zoom.hidden) closeZoom(); else if (refIsOpen()) closeRef(); });
 
@@ -1080,7 +1117,7 @@
   $('#hintBtn').addEventListener('click', hint);
   $('#undoBtn').addEventListener('click', undo);
   $('#setBtn').addEventListener('click', openSettings);
-  addEventListener('resize', () => { if (!S) return; fitPlots(); fitGrid($('#panel .lgrid'), $('#panel .gridwrap')); if (refIsOpen()) drawRef(); });
+  addEventListener('resize', () => { if (!S) return; fitPlots(); fitGrid($('#panel .lgrid'), $('#panel .gridwrap')); if (refIsOpen()) { placeRef(); drawRef(); } });
   addEventListener('hashchange', route);
 
   // ---------- guided first board: coach marks over the real board, once per kind (Settings → How to play) ----------

@@ -141,8 +141,9 @@
 
 /* ---------- menu: gear, six levels + custom, legend ---------- */
 .menu-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.gearbtn { flex: none; width: 46px; height: 46px; display: grid; place-items: center; border-radius: 14px; border: 1.5px solid var(--line); background: var(--card); color: var(--ink-2); cursor: pointer; margin-top: 4px; }
-.gearbtn .ic { width: 22px; height: 22px; }
+.gearbtn { flex: none; width: 46px; height: 46px; display: grid; place-items: center; border: 0; background: none; color: var(--blue); cursor: pointer; margin-top: 4px; padding: 0; }
+:root[data-theme="default"] .gearbtn { color: #ffffff; }
+.gearbtn .ic { width: 30px; height: 30px; }
 .lvls { grid-template-columns: repeat(3, 1fr) !important; }
 .lvl.custom { width: 100%; margin-top: 8px; flex-direction: row; justify-content: center; gap: 10px; padding: 10px; background: var(--card); border-style: dashed; }
 .legend { padding: 16px 18px; }
@@ -178,8 +179,8 @@
 .addcol .addsel-face { min-height: 32px; padding: 4px 8px; }
 
 /* ---------- reference / scratch pad overlay ---------- */
-.refpane { position: fixed; inset: 0; z-index: 25; background: rgba(10,12,16,.45); display: flex; align-items: center; justify-content: center; padding: 16px; }
-.refpane-in { width: min(760px, 100%); max-height: calc(100vh - 32px); overflow: auto; padding: 14px 16px 16px; }
+.refpane { position: fixed; z-index: 15; display: flex; }
+.refpane-in { width: 100%; height: 100%; overflow: auto; padding: 12px 16px 16px; box-shadow: 0 0 0 2px var(--blue), var(--shadow); }
 .ref-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
 .ref-head h2 { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-lg); }
 .ref-head h2 .ic { width: 20px; height: 20px; color: var(--blue); }
@@ -200,16 +201,16 @@
 
 /* ---------- menu: level tiles that fill the screen ---------- */
 .menu-in { min-height: 100vh; min-height: 100dvh; max-width: 980px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
-.tiles { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, minmax(132px, 1fr)) auto; gap: 12px; }
+.tiles { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, minmax(132px, 2fr)) minmax(66px, 1fr); gap: 12px; }
 .tile { display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 6px; text-align: left; padding: 16px; cursor: pointer; border: 1.5px solid var(--line); }
 .tile b { font-size: var(--fs-2xl); font-weight: 800; color: var(--blue); }
 .tile .tnote { font-size: var(--fs-sm); color: var(--ink-2); flex: 1; }
 .tile .tstat { font-size: var(--fs-xs); font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
 .tile:hover, .tile:focus-visible { border-color: var(--blue); }
-.tile.custom { grid-column: 1 / -1; border-style: dashed; min-height: 0; justify-content: flex-start; }
+.tile.custom { grid-column: 1 / -1; min-height: 0; justify-content: center; }
 .tile.custom b { font-size: var(--fs-xl); }
 @media (max-width: 700px) {
-  .tiles { grid-template-columns: 1fr 1fr; grid-template-rows: repeat(3, 1fr) auto; gap: 10px; }
+  .tiles { grid-template-columns: 1fr 1fr; grid-template-rows: repeat(3, 2fr) 1fr; gap: 10px; }
   .tile.custom { flex-direction: row; align-items: center; flex-wrap: wrap; }
   .tile { padding: 12px 14px; }
   .tile b { font-size: var(--fs-xl); }
@@ -288,9 +289,6 @@
   .dx { min-height: 46px; }
   .padlink { min-width: 48px; }
   .gchip { min-height: 40px; }
-  /* the reference opens as a card from the bottom, as tall as its table */
-  .refpane { padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px)); align-items: flex-end; }
-  .refpane-in { max-height: calc(100vh - 60px - env(safe-area-inset-top, 0px)); border-radius: 18px; }
 }
 }
 
@@ -306,3 +304,14 @@
 @media (max-width: 900px) and (max-height: 700px) {
   .panel { flex-basis: 42%; }
 }
+
+/* ---------- press and hold: no text selection; the latch target ---------- */
+html.holdmode .game, html.holdmode .refpane, html.holdmode .zoom { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+html.holdmode .game input, html.holdmode .game select { -webkit-user-select: text; user-select: text; }
+html.holdmode .plots figure, html.holdmode #refBtn { touch-action: none; }
+.latch { position: fixed; left: 50%; bottom: calc(28px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 40;
+  display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; }
+.latch .ic { width: 30px; height: 30px; padding: 18px; box-sizing: content-box; border-radius: 50%; color: var(--blue); background: var(--card); border: 3px dashed var(--blue); box-shadow: var(--shadow); }
+.latch span { font-size: var(--fs-xs); font-weight: 800; color: #fff; background: rgba(10,12,16,.7); padding: 3px 10px; border-radius: 999px; }
+.latch.on .ic { background: var(--blue); color: var(--card); border-style: solid; }
+.refpane.held .refpane-in { box-shadow: 0 0 0 2px var(--orange), var(--shadow); }
