@@ -29,11 +29,12 @@
 
 /* ---------- game shell: no page scroll; plots fit the space that's left ---------- */
 .game { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
-.bar { flex: none; background: var(--card); border-bottom: 1px solid var(--line); padding-top: calc(env(safe-area-inset-top, 0px) * 1.4); }
+.bar { flex: none; background: var(--card); border-bottom: 1px solid var(--line); padding-top: env(safe-area-inset-top, 0px); }
 .bar-in { max-width: 1400px; margin: 0 auto; padding: 8px 16px; display: flex; gap: 8px; align-items: center; }
 .iconbtn { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 6px 10px; border: 1.5px solid transparent; border-radius: var(--ctrl); background: none; font-weight: 600; font-size: var(--fs-sm); cursor: pointer; color: var(--ink-2); }
 .iconbtn:hover { border-color: var(--line); }
 .iconbtn:disabled { opacity: .4; cursor: default; }
+#hintBtn { color: var(--orange); background: var(--orange-bg); border-color: var(--orange); }
 .gtitle { display: flex; flex-direction: column; line-height: 1.15; margin-right: auto; min-width: 0; }
 .gtitle b { font-size: var(--fs-md); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gtitle .short { display: none; }
@@ -111,7 +112,7 @@
 .reveal { width: 30px; height: 28px; border: 1.5px solid var(--line); border-radius: 8px; background: var(--card); color: var(--blue); cursor: pointer; display: grid; place-items: center; }
 
 /* ---------- enlarged plot ---------- */
-.zoom { position: fixed; z-index: 20; background: rgba(10,12,16,.4); display: grid; place-items: center; border-radius: 12px; -webkit-user-select: none; user-select: none; }
+.zoom { position: fixed; z-index: 20; background: rgba(10,12,16,.45); display: grid; place-items: center; -webkit-user-select: none; user-select: none; }
 .zoom figure { margin: 0; background: var(--card); border-radius: 16px; padding: 10px; box-shadow: var(--shadow); }
 .zoom .dotplot { width: var(--zoom); height: var(--zoom); }
 .zoom figcaption { text-align: center; font-weight: 700; color: var(--ink-2); font-size: var(--fs-sm); margin-top: 4px; }
@@ -180,8 +181,11 @@
 .addcol .addsel-face { min-height: 32px; padding: 4px 8px; }
 
 /* ---------- reference / scratch pad overlay ---------- */
-.refpane { position: fixed; z-index: 15; display: flex; }
-.refpane-in { width: 100%; height: 100%; overflow: auto; padding: 12px 16px 16px; box-shadow: 0 0 0 2px var(--blue), var(--shadow); }
+.refpane { position: fixed; z-index: 15; display: flex; flex-direction: column; background: rgba(10,12,16,.35); padding-top: 22px; }
+.refpane-in { position: relative; flex: 1; min-height: 0; width: 100%; overflow: auto; padding: 10px 16px calc(16px + env(safe-area-inset-bottom, 0px)); border: 0; border-top: 3px solid var(--blue); border-radius: 16px 16px 0 0; box-shadow: 0 -10px 28px -8px rgba(10,12,16,.45); }
+.ref-title { display: flex; align-items: center; gap: 6px; margin: 0 44px 4px 0; font-weight: 800; font-size: var(--fs-sm); color: var(--blue); text-transform: uppercase; letter-spacing: .06em; }
+.ref-title .ic { width: 16px; height: 16px; }
+.refclose { position: absolute; top: 6px; right: 8px; width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid var(--line); background: var(--card); color: var(--ink-2); display: grid; place-items: center; cursor: pointer; z-index: 2; }
 .ref-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
 .ref-head h2 { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-lg); }
 .ref-head h2 .ic { width: 20px; height: 20px; color: var(--blue); }
@@ -256,12 +260,6 @@
 .coach-card .actions { justify-content: flex-end; margin-bottom: 0; }
 .coach-card .actions .tally { margin-right: auto; }
 
-/* Launched from the home screen: iOS 26 softens the top edge of the page under the status bar, so
-   give the bar's contents room to clear it. */
-@media (display-mode: standalone) {
-  .bar { padding-top: calc(env(safe-area-inset-top, 0px) + 24px); }
-  .menu-in { padding-top: calc(env(safe-area-inset-top, 0px) + 24px); }
-}
 
 /* ---------- phones and narrow tablets: plots above, the panel as a bottom sheet ---------- */
 @media (max-width: 900px) {
@@ -275,7 +273,7 @@
   .gtitle .long { display: none; }
   .gtitle .short { display: inline; }
   /* plots above, the answer below on the same page: no sheet to open or close */
-  .board { flex-direction: column; padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px)); gap: 8px; }
+  .board { flex-direction: column; padding: 8px 8px 0; gap: 8px; }
   .board-head { margin-bottom: 6px; }
   .board-head h1 { font-size: var(--fs-md); }
   .board-head .pill { font-size: 10px; padding: 1px 8px; }
@@ -283,7 +281,7 @@
   .plots figure { padding: 2px; border-radius: 8px; }
   .plots figcaption { font-size: 10.5px; line-height: 13px; }
   .plots.tiny figcaption { font-size: 9.5px; }
-  .panel { flex: 0 0 44%; padding: 10px 12px 12px; }
+  .panel { flex: 0 0 44%; margin: 0 -8px; padding: 10px 14px calc(12px + env(safe-area-inset-bottom, 0px)); border-radius: 0; border-width: 1px 0 0; box-shadow: none; }
   .panel .sub { display: none; } /* the rules show on wider screens; phones keep the room for plots */
   .panel .btn { min-height: 44px; }
   .panel .btn.mini { min-height: 34px; }
@@ -311,10 +309,10 @@ html.holdmode .game, html.holdmode .refpane, html.holdmode .zoom { -webkit-user-
 html.holdmode .game input, html.holdmode .game select { -webkit-user-select: text; user-select: text; }
 html.holdmode .plots figure, html.holdmode #refBtn { touch-action: none; }
 .latch { position: fixed; left: 0; right: 0; z-index: 40; display: flex; align-items: center; justify-content: center; gap: 10px;
-  background: var(--card); border-bottom: 2px solid var(--blue); pointer-events: none; padding-top: env(safe-area-inset-top, 0px); }
-.latch .ic { width: 22px; height: 22px; padding: 8px; box-sizing: content-box; border-radius: 50%; color: var(--blue); background: var(--blue-bg); border: 2px dashed var(--blue); }
+  background: var(--orange-bg); border-bottom: 2px solid var(--orange); pointer-events: none; padding-top: env(safe-area-inset-top, 0px); }
+.latch .ic { width: 22px; height: 22px; padding: 8px; box-sizing: content-box; border-radius: 50%; color: var(--orange); background: var(--card); border: 2px dashed var(--orange); }
 .latch span { font-size: var(--fs-sm); font-weight: 800; color: var(--ink); }
-.latch.on { background: var(--blue); }
-.latch.on .ic { background: var(--card); color: var(--blue); border-style: solid; }
-.latch.on span { color: var(--card); }
-.refpane.held .refpane-in { box-shadow: 0 0 0 2px var(--orange), var(--shadow); }
+.latch.on { background: var(--orange); }
+.latch.on .ic { color: var(--orange); border-style: solid; }
+.latch.on span { color: #ffffff; }
+.refpane.held .refpane-in { border-top-color: var(--orange); }

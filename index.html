@@ -13,7 +13,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="FlowCyto">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="theme-color" content="#1d5fa8">
+<meta name="theme-color" content="#ffffff">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -24,7 +24,12 @@
 (function () {
   var a = {}; try { a = (JSON.parse(localStorage.getItem('flowcyto.prefs') || '{}') || {}).appearance || {}; } catch (e) {}
   var m = a.mode || 'auto', dark = m === 'dark' || (m === 'auto' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
-  document.documentElement.setAttribute('data-theme', dark ? (a.dark || 'dark') : (a.light || 'default'));
+  var theme = dark ? (a.dark || 'dark') : (a.light || 'default');
+  document.documentElement.setAttribute('data-theme', theme);
+  /* The status bar takes theme-color, and a home-screen app reads it once, at launch: set it now to
+     the header's own color so the two are one strip from the first frame. */
+  var bar = { dark: '#181d25', black: '#0e0f12' }[theme] || '#ffffff';
+  document.querySelector('meta[name="theme-color"]').setAttribute('content', bar);
 })();
 </script>
 </head>
@@ -39,7 +44,6 @@
       <button class="iconbtn" id="undoBtn" aria-label="Undo" title="Undo"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 3.5L2.5 6.5l3 3M3 6.5h6.5a4 4 0 0 1 0 8H7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Undo</span></button>
       <button class="iconbtn" id="hintBtn"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8a4.4 4.4 0 0 0-2.6 8c.5.4.8.9.8 1.5v.5h3.6v-.5c0-.6.3-1.1.8-1.5A4.4 4.4 0 0 0 8 1.8zM6.3 13.6h3.4M6.8 15h2.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Hint</span></button>
       <button class="iconbtn" id="setBtn" aria-label="Settings"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h6M12 4.5h1.5M2.5 11.5h1.5M7.5 11.5h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="10.2" cy="4.5" r="1.7" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="5.8" cy="11.5" r="1.7" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span>Settings</span></button>
-      <button class="btn primary" id="newBtn">New<span class="wide"> board</span></button>
     </div>
   </header>
   <main class="board">

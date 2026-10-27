@@ -78,12 +78,12 @@
     document.documentElement.classList.toggle('holdmode', prefs.enlarge === 'hold' || prefs.refOpen === 'hold');
     syncStatusBar();
   }
-  /* iOS paints the status bar (and Android the browser bar) in theme-color. Match it to whatever sits
-     right under it, the game's top bar or the menu page, so the two read as one surface. */
+  /* The status bar (and Android's browser bar) takes theme-color: always the header's own color, so
+     status bar and header read as one strip. index.html sets it before the first frame, since a
+     home-screen app reads it at launch; this keeps it in step when the theme changes. */
   function syncStatusBar() {
-    const el = !$('#game').hidden ? $('.bar') : document.body;
     const m = document.querySelector('meta[name="theme-color"]');
-    if (el && m) m.setAttribute('content', getComputedStyle(el).backgroundColor);
+    if (m) m.setAttribute('content', getComputedStyle(document.documentElement).getPropertyValue('--card').trim() || '#ffffff');
   }
   if (darkScheme && darkScheme.addEventListener) darkScheme.addEventListener('change', () => { if (prefs.appearance.mode === 'auto') applyTheme(); });
   const THEME_SWATCH = { default: ['#1d5fa8', '#ffffff', '#1d5fa8'], light: ['#f6f7f9', '#ffffff', '#1d5fa8'], dark: ['#0f1217', '#181d25', '#7fb2ea'], black: ['#000000', '#0e0f12', '#7fb2ea'] };
@@ -390,7 +390,8 @@
   const padFilled = id => refFilled() || S.peeks.has(id);
   function refHTML() {
     const mks = markersOf(shownPlots()), ro = refFilled(), left = S.refs.filter(id => !S.peeks.has(id)).length;
-    let h = `<div class="ref-head"><h2>${ICON.book} Reference</h2>${refHeld ? '<span class="help">let go to close</span>' : `<button class="iconbtn" data-refclose aria-label="Close">${ICON.close}</button>`}</div>`;
+    let h = refHeld ? '' : `<button class="refclose" data-refclose aria-label="Close the reference">${ICON.close}</button>`;
+    h += `<p class="ref-title">${ICON.book} Reference</p>`;
     h += `<p class="sub">${ro ? 'Each cell type, read on the markers these plots show.' : 'Fill in each cell type\'s markers from memory: tap a cell to cycle its value. The eye fills a row from the key and counts as a peek; anything you had wrong gets a wavy underline.'}</p>`;
     if (!S.refs.length) h += `<p class="empty">No cell types yet. Add the ones you want to look up${choosing() ? '; normal cell types join the scratchpad too' : ''}.</p>`;
     else {
@@ -421,7 +422,7 @@
   let refHeld = false, refAt = 0;
   function placeRef() {
     const r = $('#panel').getBoundingClientRect();
-    Object.assign(refPane.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
+    Object.assign(refPane.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: (innerHeight - r.top) + 'px' });
   }
   function drawRef() {
     refPane.innerHTML = `<div class="refpane-in card">${refHTML()}</div>`;
@@ -452,11 +453,17 @@
     const r = latchEl.getBoundingClientRect(), m = 14;
     return ev.clientX > r.left - m && ev.clientX < r.right + m && ev.clientY > r.top - m && ev.clientY < r.bottom + m;
   }
-  addEventListener('pointermove', ev => {
-    if (!holdKind || latched || latchEl.hidden || !overLatch(ev)) return;
-    latched = true; latchEl.classList.add('on'); latchEl.innerHTML = `${ICON.lock}<span>Kept open: let go</span>`;
-    if (navigator.vibrate) navigator.vibrate(10);
-  });
+  // Inside the target = it will latch if you let go there; slide back out and it won't.
+  function trackLatch(x, y) {
+    if (!holdKind || latchEl.hidden) return;
+    const inside = overLatch({ clientX: x, clientY: y });
+    if (inside === latched) return;
+    latched = inside; latchEl.classList.toggle('on', inside);
+    latchEl.innerHTML = inside ? `${ICON.lock}<span>Let go to keep it open</span>` : `${ICON.unlock}<span>Slide up here to keep it open</span>`;
+    if (inside && navigator.vibrate) navigator.vibrate(10);
+  }
+  addEventListener('pointermove', ev => trackLatch(ev.clientX, ev.clientY));
+  addEventListener('touchmove', ev => { const t = ev.touches[0]; if (t) trackLatch(t.clientX, t.clientY); }, { passive: true });
   // Ends a hold: closes the view, unless it was latched (then it behaves as if opened by a tap).
   function endHold() {
     if (!holdKind) return;
@@ -1009,7 +1016,10 @@
   function openZoom(i) {
     zoomI = i; zoomAt = performance.now();
     // the enlarged plot covers the plot area only: the scratchpad and reference stay in view
-    const area = $('.plots-col').getBoundingClientRect();
+    const bar = $('.bar').getBoundingClientRect(), panel = $('#panel').getBoundingClientRect();
+    const below = panel.top > bar.bottom + 40 && panel.left < 40; // phones: the answer is under the plots
+    const area = below ? { left: 0, top: bar.bottom, width: innerWidth, height: panel.top - bar.bottom }
+      : { left: 0, top: bar.bottom, width: panel.left - 8, height: innerHeight - bar.bottom };
     Object.assign(zoom.style, { left: area.left + 'px', top: area.top + 'px', width: area.width + 'px', height: area.height + 'px' });
     const pl = S.P.plots[i], size = Math.floor(Math.max(140, Math.min(area.width - 28, area.height - (gatesLive() ? 96 : 56), 640)));
     const tail = gatesLive() ? `<div class="zoom-foot"><span>${S.gates[i] ? 'Drag to move the gate' : 'Drag to place a gate'}${isFscSsc(pl) ? ' (two side-scatter lines)' : ''}</span><button class="btn primary" data-done>Done</button></div>` : '';
@@ -1123,7 +1133,6 @@
 
   // ---------- top bar ----------
   $('#menuBtn').addEventListener('click', () => { location.hash = '/'; });
-  $('#newBtn').addEventListener('click', () => play(S.level));
   $('#hintBtn').addEventListener('click', hint);
   $('#undoBtn').addEventListener('click', undo);
   $('#setBtn').addEventListener('click', openSettings);
