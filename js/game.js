@@ -19,6 +19,8 @@
     yes: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5" fill="var(--blue)" stroke="var(--ink)" stroke-width="1"/></svg>',
     right: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 5" fill="none" stroke="var(--teal)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     wrong: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="var(--pink)" stroke-width="2.4" stroke-linecap="round"/></svg>',
+    share: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 10V2.5M5.2 5L8 2.2 10.8 5M5 7.2H4a1 1 0 0 0-1 1V13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V8.2a1 1 0 0 0-1-1h-1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    strike: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3.8 12.2l8.4-8.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
     link: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.8 9.2l2.4-2.4M7.4 4.6l1.2-1.2a2.6 2.6 0 0 1 3.7 3.7l-1.2 1.2M8.6 11.4l-1.2 1.2a2.6 2.6 0 0 1-3.7-3.7l1.2-1.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
     close: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
     eye: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8z" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="8" r="2.1" fill="currentColor"/></svg>',
@@ -121,9 +123,8 @@
     document.documentElement.classList.remove('in-game');
     document.title = 'FlowCyto';
     const stats = load('flowcyto.stats', {}), cur = load('flowcyto.current', null);
-    let h = `<main class="menu-in"><div class="menu-top"><div class="logo on-page"><svg width="52" height="52" viewBox="0 0 22 22" aria-hidden="true"><rect x="1" y="1" width="20" height="20" rx="5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M11 3v16M3 11h16" stroke="currentColor" stroke-width="1" stroke-dasharray="2 2"/><circle cx="7" cy="15" r="2.2" fill="currentColor"/><path d="M15 4.6l2.2 3.6h-4.4z" fill="currentColor"/></svg><div><h1>FlowCyto</h1><p>Flow cytometry logic puzzles for STEP 1</p></div></div><button class="gearbtn" data-settings aria-label="Settings" title="Settings">${ICON.gear}</button></div>`;
-    // Charlie's own copy (not the public one) offers the public link to pass on
-    if (!PUBLIC_HOST.test(location.hostname)) h += `<div class="share-row"><button class="sharebtn" data-share>${ICON.link}<span>Copy shareable link</span></button></div>`;
+    let h = `<main class="menu-in"><div class="menu-top"><div class="logo on-page"><svg width="52" height="52" viewBox="0 0 22 22" aria-hidden="true"><rect x="1" y="1" width="20" height="20" rx="5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M11 3v16M3 11h16" stroke="currentColor" stroke-width="1" stroke-dasharray="2 2"/><circle cx="7" cy="15" r="2.2" fill="currentColor"/><path d="M15 4.6l2.2 3.6h-4.4z" fill="currentColor"/></svg><div><h1>FlowCyto</h1><p>Flow cytometry logic puzzles for STEP 1</p></div></div><div class="menu-btns">${PUBLIC_HOST.test(location.hostname) ? '' : `<button class="gearbtn" data-share aria-label="Copy the shareable link" title="Copy the shareable link">${ICON.share}</button>`}<button class="gearbtn" data-settings aria-label="Settings" title="Settings">${ICON.gear}</button></div></div>`;
+    // (the share button is on Charlie's own copy only: it copies the public link to pass on)
     if (cur && cur.phase !== 'done' && LEVEL_KEYS.includes(cur.level)) {
       h += `<button class="card cont" data-continue><span class="cont-k">Continue</span><b>${levelLabel(cur.level)}</b><span>${cur.phase === 'dx' ? 'Diagnosis' : 'Scratchpad'} · ${plural(cur.wrongChecks || 0, 'mistake')}</span>${ICON.next}</button>`;
     }
@@ -155,10 +156,9 @@
       const t = Object.assign(document.createElement('textarea'), { value: PUBLIC_URL }); document.body.append(t); t.select();
       try { ok = document.execCommand('copy'); } catch (e2) { /* nothing more to try */ } t.remove();
     }
-    btn.innerHTML = ok ? `<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Copied: ${PUBLIC_URL.replace('https://', '')}</span>` : `<span>Copy failed: ${PUBLIC_URL}</span>`;
-    btn.classList.toggle('done', ok);
-    setTimeout(() => { if (btn.isConnected) { btn.innerHTML = `${ICON.link}<span>Copy shareable link</span>`; btn.classList.remove('done'); } }, 2500);
+    showTip(btn, ok ? 'Link copied' : 'Copy failed', PUBLIC_URL.replace('https://', ''), ok ? ICON.share : ICON.close);
   }
+
 
   // ---------- custom level ----------
   const csheet = $('#acts');
@@ -191,8 +191,8 @@
     const refs0 = P.choose ? [] : [...P.pool.filter(id => id !== 'abn'), ...(P.cfg.dx === 'choice' ? P.dxPool : [])];
     S = { level, seed, P, cfg: P.cfg, custom, marks: {}, checked: {}, wrongChecks: 0, hints: 0, peeks: new Set(), pad: {}, refRow: null,
       cols: P.choose ? [] : P.pool.slice(), refs: [...new Set(refs0)], typed: [], dxHint: 0,
-      focus: null, phase: P.cfg.scratch ? 'play' : 'dx', pctPick: null, msg: null, flash: null, elapsed: 0, t0: null, undo: [], why: null };
-    if (saved) Object.assign(S, { marks: saved.marks || {}, checked: saved.checked || {}, wrongChecks: saved.wrongChecks || 0, hints: saved.hints || 0, peeks: new Set(saved.peeks || []), pad: saved.pad || {}, phase: saved.phase || S.phase, pctPick: saved.pctPick || null, msg: saved.msg || null, stats: saved.stats, elapsed: saved.elapsed || 0, cols: saved.cols || S.cols, refs: saved.refs || S.refs, typed: saved.typed || [], dxHint: saved.dxHint || 0 });
+      focus: null, crossed: [], phase: P.cfg.scratch ? 'play' : 'dx', pctPick: null, msg: null, flash: null, elapsed: 0, t0: null, undo: [], why: null };
+    if (saved) Object.assign(S, { marks: saved.marks || {}, checked: saved.checked || {}, wrongChecks: saved.wrongChecks || 0, hints: saved.hints || 0, peeks: new Set(saved.peeks || []), pad: saved.pad || {}, phase: saved.phase || S.phase, pctPick: saved.pctPick || null, msg: saved.msg || null, stats: saved.stats, elapsed: saved.elapsed || 0, cols: saved.cols || S.cols, refs: saved.refs || S.refs, typed: saved.typed || [], dxHint: saved.dxHint || 0, crossed: saved.crossed || [] });
     if (gating()) {
       S.gates = (saved && saved.gates) || P.plots.map(() => null); // nothing placed: the player sets every gate
       S.sigSlot = (saved && saved.sigSlot) || {}; S.slotSig = {};
@@ -228,7 +228,7 @@
   // ---------- undo: takes back marks, reference entries, grid edits, gate moves and hint steps (not the tally) ----------
   function pushUndo() {
     if (!active()) return;
-    S.undo.push(JSON.stringify({ marks: S.marks, checked: S.checked, pad: S.pad, cols: S.cols, refs: S.refs, gates: S.gates, sigSlot: S.sigSlot, slotSig: S.slotSig, cloneRow: S.cloneRow }));
+    S.undo.push(JSON.stringify({ marks: S.marks, checked: S.checked, pad: S.pad, crossed: S.crossed, cols: S.cols, refs: S.refs, gates: S.gates, sigSlot: S.sigSlot, slotSig: S.slotSig, cloneRow: S.cloneRow }));
     if (S.undo.length > 200) S.undo.shift();
   }
   function undo() {
@@ -239,7 +239,7 @@
   }
   function persist() {
     if (!S) return;
-    save('flowcyto.current', { level: S.level, seed: S.seed, custom: S.custom, marks: S.marks, checked: S.checked, wrongChecks: S.wrongChecks, hints: S.hints, peeks: [...S.peeks], pad: S.pad, cols: S.cols, refs: S.refs, typed: S.typed, dxHint: S.dxHint, phase: S.phase, pctPick: S.pctPick, msg: S.msg, stats: S.stats, gates: S.gates, sigSlot: S.sigSlot, cloneRow: S.cloneRow, elapsed: elapsedNow() });
+    save('flowcyto.current', { level: S.level, seed: S.seed, custom: S.custom, marks: S.marks, checked: S.checked, wrongChecks: S.wrongChecks, hints: S.hints, peeks: [...S.peeks], pad: S.pad, cols: S.cols, refs: S.refs, typed: S.typed, dxHint: S.dxHint, phase: S.phase, pctPick: S.pctPick, msg: S.msg, stats: S.stats, gates: S.gates, sigSlot: S.sigSlot, cloneRow: S.cloneRow, crossed: S.crossed, elapsed: elapsedNow() });
   }
 
   const shownPlots = () => S.P.plots.map(p => [p.x, p.y]);
@@ -332,8 +332,14 @@
     return { size, compact, focus, labels: 'none', paint: S.paint, paintLabels: labels, gate: S.gates[i] || 'none' };
   }
   function drawPlots() { renderFigures(); fitPlots(); }
+  function toggleCross(i) {
+    pushUndo();
+    S.crossed = S.crossed.includes(i) ? S.crossed.filter(x => x !== i) : [...S.crossed, i];
+    renderFigures(); fitPlots(); persist(); $('#undoBtn').disabled = !active() || !S.undo.length;
+  }
   function renderFigures() {
-    $('#plots').innerHTML = S.P.plots.map((pl, i) => `<figure data-plot="${i}" class="${S.flash === i ? 'flash' : ''}">${renderPlot(S.P, pl, plotOpts(i))}${S.compact ? '' : `<figcaption>${plotName(pl)}</figcaption>`}</figure>`).join('');
+    const cc = $('#clearCrossed'); cc.hidden = !S.crossed.length; cc.innerHTML = `${ICON.close}<span>Clear crossed out (${S.crossed.length})</span>`;
+    $('#plots').innerHTML = S.P.plots.map((pl, i) => `<figure data-plot="${i}" class="${S.flash === i ? 'flash' : ''}${S.crossed.includes(i) ? ' crossed' : ''}">${S.crossed.includes(i) ? `<span class="xmark" title="crossed out">${ICON.strike}</span>` : ''}${renderPlot(S.P, pl, plotOpts(i))}${S.compact ? '' : `<figcaption>${plotName(pl)}</figcaption>`}</figure>`).join('');
   }
 
   /* Plots in a strip that scrolls sideways, one or two rows (Settings → Plot rows; two fill top to
@@ -484,7 +490,7 @@
       }
       h += '</tbody></table></div>';
     }
-    h += `<div class="ref-foot">${addSelect('data-addref', 'Add a cell type', S.refs, false)}${!ro && left ? `<button class="btn" data-fill>Fill in from the key (${plural(left, 'peek')})</button>` : ''}</div>`;
+    h += `<div class="ref-foot">${addSelect('data-addref', 'Add a cell type', S.refs, false)}${!ro && left ? `<button class="btn" data-fill>Fill in from the key (${plural(left, 'peek')})</button>` : ''}${!ro && Object.keys(S.pad).length ? '<button class="btn" data-clearref>Clear all</button>' : ''}</div>`;
     return h + '<p class="help">± partly positive, or varies by patient · κ/λ: 1 = one light chain (clonal), 2 = both, − = none · SSC lo / mid / hi.</p>';
   }
   /* The reference opens over the answer panel only, so the plots stay in view (and tappable). */
@@ -520,41 +526,58 @@
      view stays open after you let go (as if you'd tapped it). */
   const latchEl = $('#latch');
   let holdKind = null, latched = false;
+  /* Two drop zones over the top bar for a held plot: keep it open, or cross it out (it fades in the
+     grid, to mark it as read). The held reference only has "keep it open". */
+  const ZONES = { keep: ['unlock', 'lock', 'Keep it open', 'Let go to keep it open'], cross: ['strike', 'strike', 'Cross it out', 'Let go to cross it out'] };
+  function drawZones(kinds, on, tap) {
+    latchEl.innerHTML = kinds.map(z => { const [i0, i1, t0, t1] = ZONES[z], lit = on === z; return `<div class="lz ${z}${lit ? ' on' : ''}" data-lz="${z}">${tap && z === 'keep' ? ICON.close : ICON[lit ? i1 : i0]}<span>${tap ? tapLabel(z) : lit ? t1 : t0}</span></div>`; }).join('');
+    latchEl.classList.toggle('tap', !!tap);
+  }
+  const tapLabel = z => z === 'keep' ? 'Close' : S.crossed.includes(zoomI) ? 'Restore it' : 'Cross it out';
+  function placeLatch() { const r = $('.bar').getBoundingClientRect(); Object.assign(latchEl.style, { top: r.top + 'px', height: r.height + 'px' }); }
   function startHold(kind) {
-    holdKind = kind; latched = false;
-    // the target sits over the top bar: the one place that covers no plot, grid or reference
-    const r = $('.bar').getBoundingClientRect();
-    Object.assign(latchEl.style, { top: r.top + 'px', height: r.height + 'px' });
-    latchEl.innerHTML = `${ICON.unlock}<span>Slide up here to keep it open</span>`;
-    latchEl.classList.remove('on'); latchEl.hidden = false;
+    holdKind = kind; latched = null;
+    placeLatch(); drawZones(kind === 'plot' ? ['keep', 'cross'] : ['keep'], null, false);
+    latchEl.hidden = false;
   }
-  function overLatch(ev) {
-    const r = latchEl.getBoundingClientRect(), m = 14;
-    return ev.clientX > r.left - m && ev.clientX < r.right + m && ev.clientY > r.top - m && ev.clientY < r.bottom + m;
+  function zoneAt(x, y) {
+    const m = 14;
+    for (const el of latchEl.querySelectorAll('[data-lz]')) { const r = el.getBoundingClientRect(); if (x > r.left - (el.previousElementSibling ? 0 : m) && x < r.right + (el.nextElementSibling ? 0 : m) && y > r.top - m && y < r.bottom + m) return el.dataset.lz; }
+    return null;
   }
-  // Inside the target = it will latch if you let go there; slide back out and it won't.
+  // Inside a zone = that happens if you let go there; slide back out and nothing does.
   function trackLatch(x, y) {
     if (!holdKind || latchEl.hidden) return;
-    const inside = overLatch({ clientX: x, clientY: y });
-    if (inside === latched) return;
-    latched = inside; latchEl.classList.toggle('on', inside);
-    latchEl.innerHTML = inside ? `${ICON.lock}<span>Let go to keep it open</span>` : `${ICON.unlock}<span>Slide up here to keep it open</span>`;
-    if (inside && navigator.vibrate) navigator.vibrate(10);
+    const z = zoneAt(x, y);
+    if (z === latched) return;
+    latched = z; drawZones(holdKind === 'plot' ? ['keep', 'cross'] : ['keep'], z, false);
+    if (z && navigator.vibrate) navigator.vibrate(10);
   }
   addEventListener('pointermove', ev => trackLatch(ev.clientX, ev.clientY));
   addEventListener('touchmove', ev => { const t = ev.touches[0]; if (t) trackLatch(t.clientX, t.clientY); }, { passive: true });
-  // Ends a hold: closes the view, unless it was latched (then it behaves as if opened by a tap).
+  // Ends a hold: closes the view, unless it went to a zone (kept open as if tapped, or crossed out).
   function endHold() {
     if (!holdKind) return;
-    const kind = holdKind, keep = latched;
-    holdKind = null; latchEl.hidden = true;
+    const kind = holdKind, zone = latched;
+    holdKind = null; latched = null; latchEl.hidden = true;
     if (kind === 'ref') {
       refHeld = false;
-      if (keep) { refAt = performance.now(); drawRef(); }
+      if (zone === 'keep') { refAt = performance.now(); drawRef(); }
       else { closeRef(); if (performance.now() - refAt < 300) holdTip($('#refBtn'), 'Press and hold to see the Reference.'); } // only tapped
     }
-    if (kind === 'plot') { held = false; if (keep) { zoomLatched = true; zoomAt = performance.now(); if (zoomI != null) openZoom(zoomI); } else closeZoom(); }
+    if (kind === 'plot') {
+      held = false;
+      const i = zoomI;
+      if (zone === 'keep') { zoomLatched = true; zoomAt = performance.now(); if (i != null) openZoom(i); }
+      else { closeZoom(); if (zone === 'cross' && i != null) toggleCross(i); }
+    }
   }
+  // A plot open by a tap (or kept open): the same zones, tapped
+  latchEl.addEventListener('click', ev => {
+    const z = ev.target.closest('[data-lz]'); if (!z || !latchEl.classList.contains('tap')) return;
+    const i = zoomI; closeZoom();
+    if (z.dataset.lz === 'cross' && i != null) toggleCross(i);
+  });
   function fillReference() {
     if (refFilled()) return;
     for (const id of S.refs) S.peeks.add(id);
@@ -648,7 +671,8 @@
     }
     h += '</tbody></table></div>';
     const ready = rows().length > 0 && rows().every(p => S.cols.some(id => S.marks[p.label + '|' + id] === 'yes'));
-    if (play) h += `<div class="actions">${prefs.autoCheck ? '' : `<button class="btn primary" data-act="check" ${ready ? '' : 'disabled'}>Check</button>`}<span class="tally">${tallyText()}${prefs.autoCheck ? ' · auto-check on' : ''}</span></div>`;
+    const any = Object.keys(S.marks).some(k => !k.startsWith('dx|'));
+    if (play) h += `<div class="actions">${prefs.autoCheck ? '' : `<button class="btn primary" data-act="check" ${ready ? '' : 'disabled'}>Check</button>`}${any ? '<button class="btn" data-act="clearpad">Clear all</button>' : ''}<span class="tally">${tallyText()}${prefs.autoCheck ? ' · auto-check on' : ''}</span></div>`;
     return h;
   }
   /* The solved scratchpad, as one line, above the diagnosis. */
@@ -1095,6 +1119,7 @@
     if (dx) { pushUndo(); S.msg = null; checkDx(dx.dataset.dx); drawPanel(); return drawPlots(); }
     const act = ev.target.closest('[data-act]');
     if (act && act.dataset.act === 'check') return check();
+    if (act && act.dataset.act === 'clearpad') { pushUndo(); for (const k of Object.keys(S.marks)) if (!k.startsWith('dx|')) delete S.marks[k]; S.checked = {}; S.msg = null; drawPanel(); return holdTipless('Scratchpad cleared'); }
     if (act && act.dataset.act === 'dx') { checkDx(S.P.dxPool.find(id => S.marks['dx|' + id] === 'yes')); drawPanel(); return drawPlots(); }
     if (act && act.dataset.act === 'new') return play(S.level);
     if (act && act.dataset.act === 'menu') { location.hash = '/'; return; }
@@ -1134,6 +1159,7 @@
     const rv = ev.target.closest('[data-reveal]');
     if (rv) { S.peeks.add(rv.dataset.reveal); S.refRow = rv.dataset.reveal; drawRef(); return drawPanel(); }
     if (ev.target.closest('[data-fill]')) return fillReference();
+    if (ev.target.closest('[data-clearref]')) { pushUndo(); S.pad = {}; drawRef(); return holdTipless('Reference cleared'); }
     const rm = ev.target.closest('[data-refmenu]'); if (rm && active()) return openActions('ref', rm.dataset.refmenu);
   });
   refPane.addEventListener('change', ev => {
@@ -1154,12 +1180,13 @@
       : { left: 0, top: bar.bottom, width: panel.left - 8, height: innerHeight - bar.bottom };
     Object.assign(zoom.style, { left: area.left + 'px', top: area.top + 'px', width: area.width + 'px', height: area.height + 'px' });
     const pl = S.P.plots[i], size = Math.floor(Math.max(140, Math.min(area.width - 28, area.height - (gatesLive() ? 96 : 56), 640)));
-    const tail = gatesLive() ? `<div class="zoom-foot"><span>${S.gates[i] ? 'Drag to move the gate' : 'Drag to place a gate'}${isFscSsc(pl) ? ' (two side-scatter lines)' : ''}</span><button class="btn primary" data-done>Done</button></div>` : '';
+    const tail = gatesLive() ? `<div class="zoom-foot"><span>${S.gates[i] ? 'Drag to move the gate' : 'Drag to place a gate'}${isFscSsc(pl) ? ' (two side-scatter lines)' : ''}</span><span class="zoom-btns"><button class="btn" data-zcross>${ICON.strike}<span>${S.crossed.includes(i) ? 'Restore' : 'Cross out'}</span></button><button class="btn primary" data-done>Done</button></span></div>` : '';
     zoom.innerHTML = `<figure data-zplot="${i}">${renderPlot(S.P, pl, plotOpts(i, true))}<figcaption>${plotName(pl)}${!gatesLive() && (prefs.enlarge === 'tap' || gating() || zoomLatched) ? ' · tap to close' : held ? ' · let go to close' : ''}</figcaption>${tail}</figure>`;
     zoom.style.setProperty('--zoom', size + 'px');
     zoom.hidden = false;
+    if (!held && !gatesLive()) { placeLatch(); drawZones(['keep', 'cross'], null, true); latchEl.hidden = false; }
   }
-  const closeZoom = () => { zoom.hidden = true; zoom.innerHTML = ''; zoomI = null; zoomLatched = false; };
+  const closeZoom = () => { zoom.hidden = true; zoom.innerHTML = ''; zoomI = null; zoomLatched = false; if (!holdKind) { latchEl.hidden = true; latchEl.classList.remove('tap'); } };
   let holdTimer = null, held = false, drag = null, frame = 0;
   /* Pointer position -> gate, in the plot's own data units. A plot with no gate gets one where you
      press. On FSC/SSC the first line goes where you press; pressing well away from it adds the second;
@@ -1226,6 +1253,7 @@
   $('#plots').addEventListener('contextmenu', ev => ev.preventDefault());
   zoom.addEventListener('click', ev => {
     if (ev.target.closest('[data-done]')) return closeZoom();
+    if (ev.target.closest('[data-zcross]')) { const i = zoomI; closeZoom(); return toggleCross(i); }
     if (performance.now() - zoomAt < 400) return; // a touch's own follow-up click lands on the new overlay
     if (gatesLive() ? !ev.target.closest('figure') : (prefs.enlarge === 'tap' || gating() || zoomLatched)) closeZoom();
   });
@@ -1233,10 +1261,11 @@
 
   /* Reminder for a press-and-hold target that was only tapped: a bubble over it for a few seconds. */
   let tipTimer = 0;
-  function holdTip(target, text) {
+  const holdTip = (target, text) => showTip(target, text, 'Or make it a tap in Settings.', ICON.hold);
+  function showTip(target, text, sub, icon) {
     let tip = $('#holdtip');
     if (!tip) { tip = document.createElement('div'); tip.id = 'holdtip'; tip.className = 'holdtip'; tip.setAttribute('role', 'status'); document.body.append(tip); }
-    tip.innerHTML = `${ICON.hold}<span><b>${esc(text)}</b><span>Or make it a tap in Settings.</span></span>`;
+    tip.innerHTML = `${icon}<span><b>${esc(text)}</b><span>${esc(sub)}</span></span>`;
     tip.hidden = false;
     const r = target.getBoundingClientRect(), w = Math.min(320, innerWidth - 24);
     const left = Math.max(12, Math.min(innerWidth - w - 12, r.left + r.width / 2 - w / 2));
@@ -1245,6 +1274,10 @@
     if (above > 60) tip.style.top = above + 'px'; else tip.style.top = (r.bottom + 8) + 'px';
     clearTimeout(tipTimer); tipTimer = setTimeout(() => { tip.hidden = true; }, 2600);
   }
+
+  // after a clear: say so by the Undo button, which brings it all back
+  const holdTipless = text => { persist(); showTip($('#undoBtn'), text, 'Undo brings it back.', ICON.strike); };
+  $('#clearCrossed').addEventListener('click', () => { pushUndo(); S.crossed = []; renderFigures(); fitPlots(); $('#undoBtn').disabled = !active() || !S.undo.length; holdTipless('Plots restored'); });
 
   // ---------- settings ----------
   const dlg = $('#settings');
@@ -1308,7 +1341,7 @@
   $('#undoBtn').addEventListener('click', undo);
   $('#setBtn').addEventListener('click', openSettings);
   addEventListener('resize', () => { if (!S) return; fitPlots(); fitHeight($('#panel'), $('#panel .lgrid'), $('#panel .gridwrap')); if (refIsOpen()) { placeRef(); drawRef(); } });
-  addEventListener('hashchange', route);
+  addEventListener('hashchange', () => { const t = $('#holdtip'); if (t) t.hidden = true; route(); });
 
   // ---------- guided first board: coach marks over the real board, once per kind (Settings → How to play) ----------
   const tourKey = () => S.phase === 'dx' ? (S.cfg.dx === 'type' ? 'dx-type' : 'dx') : !S.cfg.scratch ? 'dx' : gating() ? (choosing() ? 'choose' : 'gating') : 'labeled';

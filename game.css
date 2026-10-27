@@ -338,11 +338,18 @@ html.holdmode #refBtn { touch-action: none; }
 html.holdmode .plots figure { touch-action: pan-x; } /* the strip still swipes sideways */
 .latch { position: fixed; left: 0; right: 0; z-index: 40; display: flex; align-items: center; justify-content: center; gap: 10px;
   background: var(--orange-bg); border-bottom: 2px solid var(--orange); pointer-events: none; padding-top: env(safe-area-inset-top, 0px); }
-.latch .ic { width: 22px; height: 22px; padding: 8px; box-sizing: content-box; border-radius: 50%; color: var(--orange); background: var(--card); border: 2px dashed var(--orange); }
+.latch { align-items: stretch; gap: 0; }
+.latch .lz { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 8px; min-width: 0; }
+.latch .lz + .lz { border-left: 2px dashed var(--orange); }
+.latch .ic { flex: none; width: 20px; height: 20px; padding: 7px; box-sizing: content-box; border-radius: 50%; color: var(--orange); background: var(--card); border: 2px dashed var(--orange); }
 .latch span { font-size: var(--fs-sm); font-weight: 800; color: var(--ink); }
-.latch.on { background: var(--orange); }
-.latch.on .ic { color: var(--orange); border-style: solid; }
-.latch.on span { color: #ffffff; }
+.latch .lz.on { background: var(--orange); }
+.latch .lz.on .ic { color: var(--orange); border-style: solid; }
+.latch .lz.on span { color: #ffffff; }
+.latch.tap { pointer-events: auto; }
+.latch.tap .lz { cursor: pointer; }
+.latch.tap .lz:active { background: var(--orange); }
+.latch.tap .lz:active span { color: #ffffff; }
 .refpane.held .refpane-in { border-top-color: var(--orange); }
 
 /* ---------- Markers quiz ---------- */
@@ -479,9 +486,17 @@ html, body { touch-action: manipulation; }
 .holdtip span span { display: block; font-size: var(--fs-xs); color: var(--muted); margin-top: 2px; }
 @keyframes tip-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .holdtip { animation: none; } }
-/* self-hosted copy only: copy the public link */
-.share-row { display: flex; justify-content: flex-start; margin-top: -6px; }
-.sharebtn { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 4px 12px; border-radius: 999px; border: 1.5px solid var(--blue); background: var(--card); color: var(--blue); font: inherit; font-size: var(--fs-sm); font-weight: 700; cursor: pointer; }
-.sharebtn .ic { width: 16px; height: 16px; }
-.sharebtn.done { border-style: dashed; }
-:root[data-theme="default"] .sharebtn { border-color: #ffffff; }
+.menu-btns { display: flex; gap: 2px; flex: none; }
+.gearbtn .ic[viewBox="0 0 16 16"] { width: 27px; height: 27px; }
+
+/* crossed-out plots: faded, dashed edge and a struck-circle badge (not color alone) */
+.plots figure { position: relative; }
+.plots figure.crossed { border-style: dashed; border-color: var(--ink-2); }
+.plots figure.crossed > svg, .plots figure.crossed > figcaption { opacity: .38; }
+.plots figure .xmark { position: absolute; top: 4px; right: 4px; z-index: 1; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; background: var(--card); color: var(--ink); }
+.plots figure .xmark .ic { width: 18px; height: 18px; }
+.clearx { margin-left: auto; flex: none; display: inline-flex; align-items: center; gap: 5px; min-height: 22px; padding: 0 10px; line-height: 1; border-radius: 999px; border: 1.5px solid currentColor; background: none; color: inherit; font: inherit; font-size: var(--fs-xs); font-weight: 700; cursor: pointer; white-space: nowrap; }
+.clearx[hidden] { display: none; }
+.clearx .ic { width: 12px; height: 12px; }
+.zoom-btns { display: flex; gap: 8px; }
+.zoom-btns .ic { width: 16px; height: 16px; }
