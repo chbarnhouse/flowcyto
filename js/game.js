@@ -316,9 +316,9 @@
     const labels = 'ABCDE'.split('').map((l, slot) => S.groups.some(g => g.slot === slot) ? l : null);
     return { size, compact, focus, labels: 'none', paint: S.paint, paintLabels: labels, gate: S.gates[i] || 'none' };
   }
-  function drawPlots() {
+  function drawPlots() { renderFigures(); fitPlots(); }
+  function renderFigures() {
     $('#plots').innerHTML = S.P.plots.map((pl, i) => `<figure data-plot="${i}" class="${S.flash === i ? 'flash' : ''}">${renderPlot(S.P, pl, plotOpts(i))}${S.compact ? '' : `<figcaption>${plotName(pl)}</figcaption>`}</figure>`).join('');
-    fitPlots();
   }
 
   /* Plots in a strip that scrolls sideways, one or two rows (Settings → Plot rows; two fill top to
@@ -337,16 +337,15 @@
     grid.classList.toggle('tiny', s < 150);
     grid.classList.toggle('strip', !fits);
   }
-  // the panel's own height at a given fit, without messages (they come and go; the plots shouldn't)
+  // the panel's own height at a given fit, without messages (they come and go; the plots shouldn't):
+  // measured in place, from its top to where its last block ends, plus its bottom padding
   function panelNeed(el, f) {
-    const keep = el.style.cssText;
-    el.style.flex = 'none'; el.style.height = 'auto';
     el.style.setProperty('--fit', f); el.style.setProperty('--gs', (+prefs.gscale || 1) * f);
     fitGrid(el.querySelector('.lgrid'), el.querySelector('.gridwrap'), f);
-    let h = el.offsetHeight;
-    for (const m of el.querySelectorAll('.msg')) h -= m.offsetHeight + parseFloat(getComputedStyle(m).marginTop) + parseFloat(getComputedStyle(m).marginBottom);
-    el.style.cssText = keep;
-    return h;
+    const last = [...el.children].filter(c => !c.classList.contains('msg') && c.offsetHeight).pop();
+    if (!last) return 0;
+    const cs = getComputedStyle(el), lm = parseFloat(getComputedStyle(last).marginBottom) || 0;
+    return Math.ceil(last.getBoundingClientRect().bottom + lm - el.getBoundingClientRect().top + el.scrollTop + parseFloat(cs.paddingBottom) + parseFloat(cs.borderBottomWidth));
   }
   function fitPlots() {
     const grid = $('#plots'); if (!S || !grid.clientWidth) return;
@@ -357,20 +356,25 @@
     if (!phone) { grid.style.height = ''; s = Math.max(64, Math.min(330, Math.floor((grid.clientHeight + gap) / R - gap - pad - cap))); }
     else {
       const sDef = Math.floor((W + gap) / (R === 1 ? 2.25 : 2.75) - gap - pad);
-      const key = [S.level, S.seed, S.phase, S.cols.length, R, W, innerHeight, prefs.gscale, prefs.cellAxis].join();
+      const key = [S.level, S.seed, S.phase, S.cols.length, R, W, $('.board').clientHeight, prefs.gscale, prefs.cellAxis].join();
       // only size against a panel drawn for this step (the plots draw first on a new board)
       if (S.plotKey === key || S.panelDrawn !== S.phase) s = S.plotKey === key ? S.plotS : sDef;
       else {
-        layPlots(grid, sDef, R, W, gap, pad);
-        const el = $('#panel'), have = el.offsetHeight;
-        // the plot size at which the panel gets exactly `need` px
-        const at = need => Math.floor(sDef + (have - need) / R);
-        const sLo = Math.max(72, Math.floor(sDef * 0.8)), sHi = Math.min(330, Math.floor((W + gap) / (R === 1 ? 1.6 : 2.1) - gap - pad));
-        const s1 = at(panelNeed(el, 1)), s76 = at(panelNeed(el, 0.76));
-        s = s1 >= sLo ? Math.min(s1, sHi) : s76 >= sLo ? sLo : sDef;
-        // small plots carry their axis names inside and drop the caption: account for that line
-        const capH = 13;
-        if ((s < 170) !== (sDef < 170)) s = Math.min(sHi, s + (s < 170 ? capH : -capH));
+        // Measure the real layout and correct, a few rounds: small plots lose their caption line, so
+        // the strip's height isn't simply proportional to the plot size.
+        const el = $('#panel'), sLo = Math.max(72, Math.floor(sDef * 0.8)), sHi = Math.min(330, Math.floor((W + gap) / (R === 1 ? 1.6 : 2.1) - gap - pad));
+        s = sDef; let prev = s, done = false;
+        for (let k = 0; k < 4 && !done; k++) {
+          if ((s < 170) !== !!S.compact) { S.compact = s < 170; renderFigures(); }
+          layPlots(grid, s, R, W, gap, pad);
+          const have = el.offsetHeight, at = need => Math.floor(s + (have - need) / R); // the size at which the panel gets exactly `need`
+          // full-size scratchpad if the plots can stay ≥ 80%; else share: the scratchpad gives up to 12%
+          // first, then the plots go down to 80%, then the scratchpad to 76%; past that it scrolls
+          const s1 = at(panelNeed(el, 1)), s88 = at(panelNeed(el, 0.88)), s76 = at(panelNeed(el, 0.76));
+          const nx = s1 >= sLo ? Math.min(s1, sHi) : s88 >= sLo ? Math.min(s88, sDef, sHi) : s76 >= sLo ? sLo : sDef;
+          if (Math.abs(nx - s) <= 1) { s = Math.min(s, nx); done = true; } else { prev = s; s = nx; }
+        }
+        if (!done) s = Math.min(s, prev); // flip-flopping across the caption line: take the size that fits
         S.plotKey = key; S.plotS = s;
       }
     }
@@ -529,7 +533,11 @@
     if (!holdKind) return;
     const kind = holdKind, keep = latched;
     holdKind = null; latchEl.hidden = true;
-    if (kind === 'ref') { refHeld = false; if (keep) { refAt = performance.now(); drawRef(); } else closeRef(); }
+    if (kind === 'ref') {
+      refHeld = false;
+      if (keep) { refAt = performance.now(); drawRef(); }
+      else { closeRef(); if (performance.now() - refAt < 300) holdTip($('#refBtn'), 'Press and hold to see the Reference.'); } // only tapped
+    }
     if (kind === 'plot') { held = false; if (keep) { zoomLatched = true; zoomAt = performance.now(); if (zoomI != null) openZoom(zoomI); } else closeZoom(); }
   }
   function fillReference() {
@@ -541,7 +549,7 @@
   /* Grid sizing: cells as big as the space allows (scratchpad cells up to finger size; reference cells
      smaller, since the read-only ones aren't touched), scaled by Settings → Grid size. A grid that fits
      is centered; one that doesn't scrolls sideways with its name column pinned. */
-  /* Fit a panel or the reference to its height: shrink the grid and the choices in steps (down to 76%);
+  /* Fit a panel or the reference to its height: shrink the grid and the choices just enough (down to 76%);
      if even that won't fit, go back to full size and let it scroll, since height no longer limits it. */
   function fitHeight(box, table, wrap) {
     if (!box) return;
@@ -555,12 +563,22 @@
       els[0].closest('table').style.setProperty('--vmax', target + 'px');
       return fits();
     };
-    for (const f of [1, 0.92, 0.84, 0.76]) { apply(f); if (fits() || trimV()) return; }
-    apply(1);
+    apply(1); if (fits() || trimV()) return;
+    apply(0.76); if (!fits() && !trimV()) return apply(1); // too much even at 76%: full size, and it scrolls
+    // shrink exactly as much as needed (fixed steps overshoot and leave a gap at the bottom)
+    let lo = 0.76, hi = 1;
+    for (let k = 0; k < 7; k++) { const m = (lo + hi) / 2; apply(m); if (fits() || trimV()) lo = m; else hi = m; }
+    apply(lo); if (!fits()) trimV();
   }
+  if (document.fonts) document.fonts.ready.then(() => { if (S) { S.plotKey = null; fitPlots(); fitHeight($('#panel'), $('#panel .lgrid'), $('#panel .gridwrap')); } });
   // the panel's height settles after the plots lay out (and changes on rotation): fit again when it does
-  let panelH = 0;
-  new ResizeObserver(() => { const el = $('#panel'); if (!S || el.clientHeight === panelH) return; panelH = el.clientHeight; fitHeight(el, el.querySelector('.lgrid'), el.querySelector('.gridwrap')); }).observe($('#panel'));
+  // (iOS Safari's toolbar settles after the first layout, so the board's height changes then too)
+  let panelH = 0, boardH = 0;
+  new ResizeObserver(() => {
+    if (!S) return;
+    const b = $('.board').clientHeight; if (b !== boardH) { boardH = b; fitPlots(); }
+    const el = $('#panel'); if (el.clientHeight === panelH) return; panelH = el.clientHeight; fitHeight(el, el.querySelector('.lgrid'), el.querySelector('.gridwrap'));
+  }).observe($('.board'));
   /* Size a grid's cells to the width it has; names are never cut unless a little shortening is all
      it takes to avoid scrolling sideways (if it has to scroll anyway, they stay whole). */
   function fitGrid(table, wrap, fit = 1) {
@@ -1029,7 +1047,6 @@
   $('#panel').addEventListener('click', ev => {
     if (ev.target.closest('#refBtn')) {
       if (prefs.refOpen === 'tap' || !refFilled()) openRef();
-      else if (!refIsOpen() && performance.now() - refAt < 400) holdTip($('#refBtn'), 'Press and hold to see the Reference.'); // a quick tap opened and shut it
       return;
     }
     const ch = ev.target.closest('[data-colh]');

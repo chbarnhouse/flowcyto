@@ -207,7 +207,7 @@ html.in-game, html.in-game body { background: var(--card); }
 
 /* ---------- reference / scratch pad overlay ---------- */
 .refpane { position: fixed; z-index: 15; display: flex; flex-direction: column; background: rgba(10,12,16,.35); padding-top: 22px; }
-.refpane-in { position: relative; flex: 1; min-height: 0; width: 100%; overflow: auto; padding: 10px max(18px, calc(env(safe-area-inset-right, 0px) + 10px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(18px, calc(env(safe-area-inset-left, 0px) + 10px)); border: 0; border-top: 3px solid var(--blue); border-radius: 16px 16px 0 0; box-shadow: 0 -10px 28px -8px rgba(10,12,16,.45); }
+.refpane-in { position: relative; flex: 1; min-height: 0; width: 100%; overflow: auto; padding: 10px max(18px, calc(env(safe-area-inset-right, 0px) + 10px)) max(16px, env(safe-area-inset-bottom, 0px)) max(18px, calc(env(safe-area-inset-left, 0px) + 10px)); border: 0; border-top: 3px solid var(--blue); border-radius: 16px 16px 0 0; box-shadow: 0 -10px 28px -8px rgba(10,12,16,.45); }
 .ref-title { display: flex; align-items: center; gap: 6px; margin: 0 44px 4px 0; font-weight: 800; font-size: var(--fs-sm); color: var(--blue); text-transform: uppercase; letter-spacing: .06em; }
 .ref-title .ic { width: 16px; height: 16px; }
 .refclose { position: absolute; top: 8px; right: max(14px, calc(env(safe-area-inset-right, 0px) + 8px)); width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid var(--line); background: var(--card); color: var(--ink-2); display: grid; place-items: center; cursor: pointer; z-index: 2; }
@@ -311,7 +311,7 @@ html.in-game, html.in-game body { background: var(--card); }
   .plots figure { padding: 2px; border-radius: 8px; }
   .plots figcaption { font-size: 10.5px; line-height: 13px; }
   .plots.tiny figcaption { font-size: 9.5px; }
-  .panel { flex: 1 1 0; margin: 0 -8px; padding: 10px max(16px, calc(env(safe-area-inset-right, 0px) + 8px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(16px, calc(env(safe-area-inset-left, 0px) + 8px)); border-radius: 0; border-width: 1px 0 0; box-shadow: none; }
+  .panel { flex: 1 1 0; margin: 0 -8px; padding: 10px max(16px, calc(env(safe-area-inset-right, 0px) + 8px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, calc(env(safe-area-inset-left, 0px) + 8px)); border-radius: 0; border-width: 1px 0 0; box-shadow: none; }
   .panel .sub { display: none; } /* the rules show on wider screens; phones keep the room for plots */
   .panel .btn { min-height: 44px; }
   .panel .btn.mini { min-height: 34px; }
