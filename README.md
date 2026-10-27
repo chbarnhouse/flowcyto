@@ -7,9 +7,10 @@ A flow cytometry logic puzzle for STEP 1, a companion to Step 1 Pathways. Read t
 - **Diagnose the clone**: one abnormal population against a list of look-alike neoplasms.
 
 **Levels:**
-- **Easy:** more plots, and profiles are free to view.
-- **Medium:** the minimum set of plots, and a peek at a profile counts against you.
-- **Hard:** five populations, a red-herring plot, and a "what share of events" question.
+- **Easy:** more plots, and the reference table comes filled in.
+- **Medium:** the minimum set of plots; peeking at the reference counts against you.
+- **Hard:** no labels: you drag a quad gate on each plot, and the events sort themselves into lettered groups.
+- **Extreme:** gates, five populations that touch, a red-herring plot, and a "what share of events" question.
 
 ## Run it
 Static files with no build step and no dependencies:
@@ -20,8 +21,10 @@ python3 -m http.server 8793
 
 Then open http://localhost:8793. The URL hash names the board (`#pops/medium/12345`), so any board can be replayed.
 
-## Charlie's copy
-https://flowcyto.chbarnhouse.com (LAN/VPN only). `./deploy.sh` pushes the static files into the container and restarts `flowcyto.service` (python3 http.server on port 8020); `--setup` on the first run. Settings in `deploy.env` (git-ignored; see `deploy.env.example`).
+## Publishing
+- **GitHub Pages** serves this repository's `main` branch as it is: no build step. Pushing `main` publishes.
+- **Self-hosted copy:** `./deploy.sh` copies the static files into a Proxmox container and serves them there (`--setup` on the first run). Settings live in `deploy.env`, which is git-ignored; see `deploy.env.example`.
+- **No server or accounts:** stats, streaks, settings and the board in progress stay in each visitor's own browser (localStorage).
 
 ## Files
 - `js/kb.js`: markers, normal populations, neoplasms (marker profiles, hallmarks, teaching lines), specimens, and the curated plot pairs.
