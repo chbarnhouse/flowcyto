@@ -68,7 +68,11 @@ rm -f /tmp/flowcyto.tgz
 REMOTE
 
 echo "==> Verifying"
-sleep 2
-curl -fsS --max-time 10 "http://$CT_IP:$PORT/" | grep -q "<title>FlowCyto</title>" || { echo "!! page did not render" >&2; exit 1; }
-curl -fsS --max-time 10 "http://$CT_IP:$PORT/js/gen.js" | grep -q "function generate" || { echo "!! scripts missing" >&2; exit 1; }
+# the restarted server can take a few seconds to answer
+ok=""; for i in 1 2 3 4 5 6; do
+  sleep 2
+  curl -fsS --max-time 10 "http://$CT_IP:$PORT/" | grep -q "<title>FlowCyto</title>" \
+    && curl -fsS --max-time 10 "http://$CT_IP:$PORT/js/gen.js" | grep -q "function generate" && { ok=1; break; }
+done
+[ -n "$ok" ] || { echo "!! the page or its scripts did not load" >&2; exit 1; }
 echo "==> OK — http://$CT_IP:$PORT  ${PUBLIC_URL:+·  $PUBLIC_URL}"
