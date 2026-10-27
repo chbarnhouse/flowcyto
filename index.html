@@ -35,7 +35,8 @@
   <header class="bar">
     <div class="bar-in">
       <button class="iconbtn" id="menuBtn" aria-label="Main menu"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3L5 8l5 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Menu</span></button>
-      <div class="gtitle"><b id="gMode"></b><span id="gLevel"></span></div>
+      <div class="gtitle"><b id="gMode"></b><span><span id="gLevel"></span><span id="timer" class="timer" hidden></span></span></div>
+      <button class="iconbtn" id="undoBtn" aria-label="Undo" title="Undo"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 3.5L2.5 6.5l3 3M3 6.5h6.5a4 4 0 0 1 0 8H7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Undo</span></button>
       <button class="iconbtn" id="hintBtn"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8a4.4 4.4 0 0 0-2.6 8c.5.4.8.9.8 1.5v.5h3.6v-.5c0-.6.3-1.1.8-1.5A4.4 4.4 0 0 0 8 1.8zM6.3 13.6h3.4M6.8 15h2.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Hint</span></button>
       <button class="iconbtn" id="setBtn" aria-label="Settings"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h6M12 4.5h1.5M2.5 11.5h1.5M7.5 11.5h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="10.2" cy="4.5" r="1.7" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="5.8" cy="11.5" r="1.7" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span>Settings</span></button>
       <button class="btn primary" id="newBtn">New<span class="wide"> board</span></button>
@@ -52,6 +53,7 @@
 
 <div id="zoom" class="zoom" hidden></div>
 <dialog id="settings" class="settings card"></dialog>
+<div id="coach" class="coach" hidden></div>
 
 <script src="js/kb.js"></script>
 <script src="js/gen.js"></script>

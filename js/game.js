@@ -27,9 +27,32 @@
   // ---------- storage (every access guarded: private windows may refuse) ----------
   const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || 'null') || d; } catch (e) { return d; } };
   const save = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* stats/prefs just don't persist */ } };
-  const prefs = Object.assign({ enlarge: 'hold', autoCheck: false }, load('flowcyto.prefs', {}));
+  const prefs = Object.assign({ enlarge: 'hold', autoCheck: false, timer: false, tours: {} }, load('flowcyto.prefs', {}));
   prefs.appearance = Object.assign({ mode: 'auto', light: 'default', dark: 'dark' }, prefs.appearance || {});
   const setPref = (k, v) => { prefs[k] = v; save('flowcyto.prefs', prefs); };
+  // 2026-10-27: the old Hard became Extreme, with a gentler gated Hard below it. Move its stats and
+  // any board in progress across once.
+  if (!prefs.levels4) {
+    const st = load('flowcyto.stats', {});
+    for (const m of Object.keys(MODES)) if (st[m + '/hard'] && !st[m + '/extreme']) { st[m + '/extreme'] = st[m + '/hard']; delete st[m + '/hard']; }
+    save('flowcyto.stats', st);
+    const cur = load('flowcyto.current', null); if (cur && cur.level === 'hard') { cur.level = 'extreme'; save('flowcyto.current', cur); }
+    setPref('levels4', true);
+  }
+
+  // ---------- daily boards: one per mode per day (local date), at Medium; a streak of days ----------
+  const DAILY_LEVEL = 'medium';
+  const dayKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const today = () => dayKey(new Date());
+  function dailySeed(mode, day = today()) { let h = 2166136261; for (const c of day + '/' + mode) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return (h >>> 0) || 1; }
+  const isDaily = () => !!S && S.level === DAILY_LEVEL && S.seed === dailySeed(S.mode);
+  function streak() {
+    const done = load('flowcyto.daily', {}), d = new Date();
+    if (!(done[dayKey(d)] || []).length) d.setDate(d.getDate() - 1); // today still counts until it's over
+    let n = 0; while ((done[dayKey(d)] || []).length) { n++; d.setDate(d.getDate() - 1); }
+    return n;
+  }
+  const fmtTime = ms => { const t = Math.round(ms / 1000); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
 
   // ---------- appearance: Auto / Light / Dark, plus which light and which dark theme (as in Pathways) ----------
   const darkScheme = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null;
@@ -59,7 +82,8 @@
 
   // ---------- main menu ----------
   function showMenu() {
-    S = null;
+    if (S) { pauseTimer(); persist(); }
+    S = null; endTour();
     $('#game').hidden = true; $('#menu').hidden = false;
     document.title = 'FlowCyto';
     const stats = load('flowcyto.stats', {}), cur = load('flowcyto.current', null);
@@ -67,19 +91,24 @@
     if (cur && cur.phase !== 'done') {
       h += `<button class="card cont" data-continue><span class="cont-k">Continue</span><b>${esc(MODES[cur.mode].name)}</b><span>${LEVELS[cur.level].label} · board ${cur.seed} · ${plural(cur.wrongChecks || 0, 'mistake')}</span><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`;
     }
+    const daily = load('flowcyto.daily', {})[today()] || [], st = streak();
+    h += `<section class="card daily"><div class="dhead"><h2>Daily boards</h2><span class="streak">${plural(st, 'day')} in a row</span></div><p>A new board for each mode every day, at Medium.</p><div class="dbtns">${Object.entries(MODES).map(([m, M]) => {
+      const done = daily.includes(m);
+      return `<button class="dbtn${done ? ' done' : ''}" data-daily="${m}"><span class="micon">${M.icon}</span><b>${M.name}</b><span>${done ? ICON.right + ' solved today' : 'play today\'s'}</span></button>`; }).join('')}</div></section>`;
     for (const [m, M] of Object.entries(MODES)) {
       h += `<section class="card mcard"><div class="mhead"><span class="micon">${M.icon}</span><h2>${M.name}</h2></div><p>${M.blurb}</p><div class="lvls">`;
       for (const [l, L] of Object.entries(LEVELS)) {
         const st = stats[m + '/' + l];
-        h += `<button class="lvl" data-play="${m}/${l}"><b>${L.label}</b><span>${st ? `${st.solved} solved` : 'new'}</span></button>`;
+        h += `<button class="lvl" data-play="${m}/${l}"><b>${L.label}</b><span>${st ? `${st.solved} solved` : 'new'}${prefs.timer && st && st.best ? ` · best ${fmtTime(st.best)}` : ''}</span></button>`;
       }
       h += '</div></section>';
     }
-    h += `<div class="menu-foot on-page"><span class="muted">Easy: more plots, reference filled in · Medium: fewest plots · Hard: no labels (you place the gates), populations that touch, a red herring and a share-of-events question</span><button class="btn" data-settings>Settings</button></div></main>`;
+    h += `<div class="menu-foot on-page"><span class="muted">Easy: more plots, reference filled in · Medium: fewest plots · Hard: no labels, you place the gates · Extreme: gates, five populations that touch, a red herring and a share-of-events question</span><button class="btn" data-settings>Settings</button></div></main>`;
     $('#menu').innerHTML = h;
   }
   $('#menu').addEventListener('click', ev => {
     const p = ev.target.closest('[data-play]'); if (p) { const [m, l] = p.dataset.play.split('/'); return play(m, l); }
+    const dl = ev.target.closest('[data-daily]'); if (dl) return play(dl.dataset.daily, DAILY_LEVEL, dailySeed(dl.dataset.daily));
     if (ev.target.closest('[data-continue]')) { const c = load('flowcyto.current', null); return play(c.mode, c.level, c.seed); }
     if (ev.target.closest('[data-settings]')) openSettings();
   });
@@ -88,8 +117,9 @@
   function startGame(mode, level, seed, saved) {
     seed = seed || ((Math.random() * 1e9) >>> 0);
     const P = generate(seed, level, mode);
-    S = { mode, level, seed, P, marks: {}, checked: {}, wrongChecks: 0, hints: 0, peeks: new Set(), pad: {}, padRow: null, tab: 'answer', sheet: 'open', focus: null, phase: 'play', pctPick: null, msg: null, flash: null };
-    if (saved) Object.assign(S, { marks: saved.marks || {}, checked: saved.checked || {}, wrongChecks: saved.wrongChecks || 0, hints: saved.hints || 0, peeks: new Set(saved.peeks || []), pad: saved.pad || {}, phase: saved.phase || 'play', pctPick: saved.pctPick || null, msg: saved.msg || null, stats: saved.stats });
+    endTour();
+    S = { mode, level, seed, P, marks: {}, checked: {}, wrongChecks: 0, hints: 0, peeks: new Set(), pad: {}, padRow: null, tab: 'answer', sheet: 'open', focus: null, phase: 'play', pctPick: null, msg: null, flash: null, elapsed: 0, t0: null, undo: [], why: null };
+    if (saved) Object.assign(S, { marks: saved.marks || {}, checked: saved.checked || {}, wrongChecks: saved.wrongChecks || 0, hints: saved.hints || 0, peeks: new Set(saved.peeks || []), pad: saved.pad || {}, phase: saved.phase || 'play', pctPick: saved.pctPick || null, msg: saved.msg || null, stats: saved.stats, elapsed: saved.elapsed || 0 });
     if (gating()) {
       S.gates = (saved && saved.gates) || initGates();
       S.sigSlot = (saved && saved.sigSlot) || {}; S.slotSig = {};
@@ -104,11 +134,39 @@
     $('#specName').textContent = P.specName;
     $('#boardId').textContent = `board ${seed}`;
     document.title = `FlowCyto · ${MODES[mode].name}`;
+    $('#boardId').textContent = isDaily() ? `daily · ${today()}` : `board ${seed}`;
+    resumeTimer(); tickTimer();
     drawPlots(); drawPanel();
+    const tk = tourKey();
+    if (S.phase === 'play' && !prefs.tours[tk]) setTimeout(() => { if (S && S.seed === seed) startTour(tk); }, 350);
+  }
+
+  // ---------- timer (Settings → Timer; always kept for personal bests, shown only when on) ----------
+  const elapsedNow = () => S ? S.elapsed + (S.t0 != null ? performance.now() - S.t0 : 0) : 0;
+  function pauseTimer() { if (S && S.t0 != null) { S.elapsed = elapsedNow(); S.t0 = null; } }
+  function resumeTimer() { if (S && S.phase === 'play' && !document.hidden && S.t0 == null) S.t0 = performance.now(); }
+  function tickTimer() {
+    const t = $('#timer'); if (!S) return;
+    t.hidden = !prefs.timer; if (prefs.timer) t.textContent = ' · ' + fmtTime(elapsedNow());
+  }
+  setInterval(tickTimer, 1000);
+  document.addEventListener('visibilitychange', () => { if (!S) return; if (document.hidden) { pauseTimer(); persist(); } else resumeTimer(); });
+
+  // ---------- undo: takes back marks, pad entries, gate moves and hint steps (not the tally) ----------
+  function pushUndo() {
+    if (!S || S.phase !== 'play') return;
+    S.undo.push(JSON.stringify({ marks: S.marks, checked: S.checked, pad: S.pad, gates: S.gates, sigSlot: S.sigSlot, slotSig: S.slotSig, cloneRow: S.cloneRow }));
+    if (S.undo.length > 200) S.undo.shift();
+  }
+  function undo() {
+    if (!S || !S.undo.length || S.phase !== 'play') return;
+    Object.assign(S, JSON.parse(S.undo.pop()));
+    if (gating()) regroup();
+    S.msg = null; drawPlots(); drawPanel();
   }
   function persist() {
     if (!S) return;
-    save('flowcyto.current', { mode: S.mode, level: S.level, seed: S.seed, marks: S.marks, checked: S.checked, wrongChecks: S.wrongChecks, hints: S.hints, peeks: [...S.peeks], pad: S.pad, phase: S.phase, pctPick: S.pctPick, msg: S.msg, stats: S.stats, gates: S.gates, sigSlot: S.sigSlot, cloneRow: S.cloneRow });
+    save('flowcyto.current', { mode: S.mode, level: S.level, seed: S.seed, marks: S.marks, checked: S.checked, wrongChecks: S.wrongChecks, hints: S.hints, peeks: [...S.peeks], pad: S.pad, phase: S.phase, pctPick: S.pctPick, msg: S.msg, stats: S.stats, gates: S.gates, sigSlot: S.sigSlot, cloneRow: S.cloneRow, elapsed: elapsedNow() });
   }
 
   const shownPlots = () => S.P.plots.map(p => [p.x, p.y]);
@@ -310,6 +368,7 @@
     el.innerHTML = `<div class="tabs" role="tablist">${tab('answer', 'Answer')}${tab('pad', freePeeks() ? 'Reference' : 'Scratch pad')}<button class="sheet-tg" data-sheet aria-label="${S.sheet === 'min' ? 'Show the panel' : 'Shrink the panel'}"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="${chev}" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div><div class="tabbody">${S.tab === 'pad' ? padHTML() : h}</div>`;
     el.classList.toggle('min', S.sheet === 'min');
     $('#hintBtn').disabled = !play;
+    $('#undoBtn').disabled = !play || !S.undo.length;
     persist();
     fitPlots();
   }
@@ -370,6 +429,7 @@
     if (rows().every(q => S.checked[q.label] === 'right') && (!gating() || !gateProblems().length)) finishBoard();
   }
   function finishBoard() {
+    pauseTimer();
     S.msg = { kind: 'good', html: `<b>Solved.</b> ${S.mode === 'pops' ? 'Every population is right.' : 'That is the diagnosis.'}` };
     S.phase = S.P.pct ? 'pct' : 'done';
     if (S.phase === 'done') record();
@@ -385,7 +445,9 @@
   function record() {
     const st = load('flowcyto.stats', {}), k = S.mode + '/' + S.level, v = st[k] || { solved: 0, clean: 0 };
     v.solved++; if (!S.wrongChecks && !S.peeks.size && !S.hints) v.clean++;
+    const ms = elapsedNow(); S.time = ms; S.newBest = !v.best || ms < v.best; if (S.newBest) v.best = ms;
     st[k] = v; save('flowcyto.stats', st); S.stats = v;
+    if (isDaily()) { const d = load('flowcyto.daily', {}), t = today(); d[t] = [...new Set([...(d[t] || []), S.mode])]; save('flowcyto.daily', d); }
   }
 
   // ---------- hints: one logical step, with its reason ----------
@@ -410,8 +472,11 @@
       const lines = gt.y1 != null ? [['y1', 'SSC'], ['y2', 'SSC']] : [['x', xm], ['y', ym]];
       for (const [k, mk] of lines) {
         const cost = v => P.pops.map((p, pi) => {
-          if (naturallySplit(p, mk)) return 0;
-          const evs = P.events[pi], up = evs.filter(e => axisVal(e, mk) > v).length / evs.length, want = side(p, mk, k);
+          const evs = P.events[pi];
+          // a naturally split population (polyclonal light chains, CD23…): each event belongs on the side of
+          // its own part, so count events the line puts across from where they were drawn
+          if (naturallySplit(p, mk)) return isScatter(mk) ? 0 : evs.filter(e => (axisVal(e, mk) > FC.CUT) !== (axisVal(e, mk) > v)).length / evs.length;
+          const up = evs.filter(e => axisVal(e, mk) > v).length / evs.length, want = side(p, mk, k);
           return want === 'above' ? 1 - up : want === 'below' ? up : Math.min(up, 1 - up);
         });
         const now = cost(gt[k]);
@@ -439,6 +504,7 @@
 
   function hint() {
     if (S.phase !== 'play') return;
+    pushUndo();
     const P = S.P, mks = markersOf(shownPlots());
     if (gating()) {
       const bg = badGate();
@@ -447,7 +513,7 @@
         S.hints++; S.msg = { kind: 'hint', html: `<b>Hint.</b> The ${lineName(bg)} on ${plotName(bg.pl)} cut through a population or left one on the wrong side. Moved it into the gap.` };
         S.flash = bg.i; S.tab = 'answer'; S.sheet = 'open'; drawPlots(); drawPanel();
         const m = document.querySelector('#panel .msg.hint'); if (m) m.scrollIntoView({ block: 'nearest' });
-        setTimeout(() => { S.flash = null; const f = document.querySelector('figure.flash'); if (f) f.classList.remove('flash'); }, 2600);
+        setTimeout(() => { if (!S) return; S.flash = null; const f = document.querySelector('figure.flash'); if (f) f.classList.remove('flash'); }, 2600);
         return;
       }
       if (S.mode === 'clone') {
@@ -468,7 +534,7 @@
       S.tab = 'answer'; S.sheet = 'open';
       drawPlots(); drawPanel();
       const m = document.querySelector('#panel .msg.hint'); if (m) m.scrollIntoView({ block: 'nearest' });
-      if (S.flash != null) setTimeout(() => { S.flash = null; const f = document.querySelector('figure.flash'); if (f) f.classList.remove('flash'); }, 2600);
+      if (S.flash != null) setTimeout(() => { if (!S) return; S.flash = null; const f = document.querySelector('figure.flash'); if (f) f.classList.remove('flash'); }, 2600);
     };
     const who = (p, r) => S.mode === 'pops' ? rowTag(r) : `The clone (${rowTag(r)})`;
     // 1. mistakes
@@ -519,13 +585,14 @@
   // ---------- recap ----------
   function recap() {
     const P = S.P, plots = P.plots;
-    let h = `<div class="recap"><p class="tally">${tallyText()}. ${S.stats ? `${S.stats.solved} solved at this level, ${S.stats.clean} clean (no mistakes, hints or peeks).` : ''}</p>`;
+    let h = `<div class="recap"><p class="tally">${tallyText()}${prefs.timer && S.time ? ` · ${fmtTime(S.time)}${S.newBest ? ' (personal best)' : ''}` : ''}. ${S.stats ? `${S.stats.solved} solved at this level, ${S.stats.clean} clean (no mistakes, hints or peeks).` : ''}${isDaily() ? ` Today's daily is done: ${plural(streak(), 'day')} in a row.` : ''}</p>`;
+    if (S.why) h += whyHTML();
     const pops = S.mode === 'clone' ? [target()] : P.pops;
     h += `<h3>${S.mode === 'clone' ? 'The clone' : 'The populations'}</h3>`;
     for (const p of pops) {
       const e = BY[p.id];
       const lc = p.lc === 'kappa' || p.lc === 'lambda' ? ` (${p.lc} restricted)` : '';
-      h += `<div class="item">${gating() ? '' : popTag(p) + ' '}${esc(e.long)}${lc} · ${Math.round(p.frac * 100)}% of events<div class="why">${esc(e.teach)}</div></div>`;
+      h += `<div class="item">${gating() ? '' : popTag(p) + ' '}${esc(e.long)}${lc} · ${Math.round(p.frac * 100)}% of events <button class="btn mini" data-why="${P.pops.indexOf(p)}">Why?</button><div class="why">${esc(e.teach)}</div></div>`;
     }
     const decoys = S.mode === 'clone' ? P.pool.filter(id => id !== target().id) : P.pool.filter(id => !P.pops.some(p => p.id === id));
     if (decoys.length) {
@@ -543,6 +610,33 @@
     return h;
   }
 
+  // ---------- why replay: step through the plots that decided one population ----------
+  function whySteps(pop) {
+    const P = S.P, others = P.pool.filter(id => id !== pop.id), byPlot = new Map(), taken = [];
+    for (const id of others) {
+      const c = firstContradiction(id, pop);
+      if (!c) { taken.push(id); continue; }
+      if (!byPlot.has(c.plot)) byPlot.set(c.plot, []);
+      byPlot.get(c.plot).push({ id, text: c.text });
+    }
+    const steps = [...byPlot.entries()].sort((a, b) => a[0] - b[0]).map(([plot, list]) => ({ plot,
+      html: `<b>${esc(plotName(P.plots[plot]))}</b> rules out ${list.map(x => esc(BY[x.id].name)).join(', ')}. ${esc(list[0].text[0].toUpperCase() + list[0].text.slice(1))}.` }));
+    if (taken.length) steps.push({ plot: null, html: `${taken.map(id => esc(BY[id].name)).join(', ')} also ${taken.length > 1 ? 'fit' : 'fits'} these plots, but ${taken.length > 1 ? 'each belongs' : 'it belongs'} to another population, and no identity is used twice.` });
+    steps.push({ plot: null, html: `That leaves <b>${esc(BY[pop.id].long)}</b>. ${esc(BY[pop.id].teach)}` });
+    return steps;
+  }
+  function whyHTML() {
+    const w = S.why, st = w.steps[w.i], pop = S.P.pops[w.k];
+    return `<div class="msg hint whybox"><div class="whyhead"><b>Why: ${esc(BY[pop.id].name)}</b><span class="tally">step ${w.i + 1} of ${w.steps.length}</span></div><p>${st.html}</p><div class="actions"><button class="btn mini" data-whystep="-1" ${w.i ? '' : 'disabled'}>Back</button><button class="btn mini primary" data-whystep="1" ${w.i < w.steps.length - 1 ? '' : 'disabled'}>Next</button><button class="btn mini" data-whyclose>Close</button></div></div>`;
+  }
+  function showWhy() {
+    const w = S.why, st = w && w.steps[w.i];
+    S.flash = st && st.plot != null ? st.plot : null;
+    if (w) { const pop = S.P.pops[w.k]; S.focus = gating() ? ((S.groups.find(g => g.pop === pop) || {}).slot ?? null) : pop.slot; } else S.focus = null;
+    drawPlots(); drawPanel();
+    const box = document.querySelector('#panel .whybox'); if (box) box.scrollIntoView({ block: 'nearest' });
+  }
+
   // ---------- panel input ----------
   const cycle = m => m === undefined ? 'no' : m === 'no' ? 'yes' : undefined;
   $('#panel').addEventListener('click', ev => {
@@ -553,6 +647,7 @@
     if (jp) return jumpToPad(jp.dataset.jump);
     const pc = ev.target.closest('[data-pad]');
     if (pc) {
+      pushUndo();
       const [id, mk] = pc.dataset.pad.split('|'), key = id + '|' + mk, c = padCycle(mk), i = c.indexOf(S.pad[key]);
       if (i === c.length - 1) delete S.pad[key]; else S.pad[key] = c[i + 1];
       return drawPanel();
@@ -562,9 +657,10 @@
     const fc = ev.target.closest('[data-focus]');
     if (fc) { const slot = rows().find(p => p.label === fc.dataset.focus).slot; S.focus = S.focus === slot ? null : slot; drawPlots(); return drawPanel(); }
     const crw = ev.target.closest('[data-crow]');
-    if (crw) { S.cloneRow = S.cloneRow === crw.dataset.crow ? null : crw.dataset.crow; S.msg = null; drawPlots(); return drawPanel(); }
+    if (crw) { pushUndo(); S.cloneRow = S.cloneRow === crw.dataset.crow ? null : crw.dataset.crow; S.msg = null; drawPlots(); return drawPanel(); }
     const cell = ev.target.closest('[data-cell]');
     if (cell) {
+      pushUndo();
       const [row, id] = cell.dataset.cell.split('|'), key = row + '|' + id, next = cycle(S.marks[key]);
       if (next === 'yes') for (const k of Object.keys(S.marks)) {
         const [r2, i2] = k.split('|');
@@ -577,6 +673,7 @@
     }
     const dx = ev.target.closest('[data-dx]');
     if (dx) {
+      pushUndo();
       const key = 'dx|' + dx.dataset.dx, next = cycle(S.marks[key]);
       if (next === 'yes') for (const k of Object.keys(S.marks)) if (S.marks[k] === 'yes') delete S.marks[k];
       if (next) S.marks[key] = next; else delete S.marks[key];
@@ -590,6 +687,11 @@
     if (act && act.dataset.act === 'menu') { location.hash = '/'; return; }
     const pct = ev.target.closest('[data-pct]');
     if (pct) return answerPct(+pct.dataset.pct);
+    const wb = ev.target.closest('[data-why]');
+    if (wb) { const k = +wb.dataset.why; S.why = { k, i: 0, steps: whySteps(S.P.pops[k]) }; return showWhy(); }
+    const ws = ev.target.closest('[data-whystep]');
+    if (ws) { S.why.i = Math.max(0, Math.min(S.why.steps.length - 1, S.why.i + +ws.dataset.whystep)); return showWhy(); }
+    if (ev.target.closest('[data-whyclose]')) { S.why = null; return showWhy(); }
   });
   // Pointing at a row (mouse) highlights that population in every plot.
   $('#panel').addEventListener('mouseover', ev => {
@@ -641,12 +743,13 @@
   $('#plots').addEventListener('pointermove', ev => {
     if (!drag || drag.zoom) return;
     if (!drag.moved && Math.hypot(ev.clientX - drag.x0, ev.clientY - drag.y0) < 6) return;
+    if (!drag.moved) pushUndo();
     drag.moved = true; moveGate(drag, ev);
   });
   $('#plots').addEventListener('pointerup', () => { if (!drag || drag.zoom) return; const d = drag; drag = null; if (!d.moved) openZoom(d.i); });
   zoom.addEventListener('pointerdown', ev => {
     if (!gating() || zoomI == null || !ev.target.closest('svg') || S.phase !== 'play') return;
-    drag = { i: zoomI, zoom: true, moved: true }; zoom.setPointerCapture(ev.pointerId); moveGate(drag, ev);
+    pushUndo(); drag = { i: zoomI, zoom: true, moved: true }; zoom.setPointerCapture(ev.pointerId); moveGate(drag, ev);
   });
   zoom.addEventListener('pointermove', ev => { if (drag && drag.zoom) moveGate(drag, ev); });
   zoom.addEventListener('pointerup', () => { if (drag && drag.zoom) drag = null; });
@@ -671,9 +774,11 @@
     h += `<div class="set-row themes"><div><b>Light theme</b></div><div class="theme-row" role="radiogroup">${themeChoice('light', 'default', 'Default')}${themeChoice('light', 'light', 'Light')}</div></div>`;
     h += `<div class="set-row themes"><div><b>Dark theme</b></div><div class="theme-row" role="radiogroup">${themeChoice('dark', 'dark', 'Dark')}${themeChoice('dark', 'black', 'Black')}</div></div>`;
     h += `<div class="set-row"><div><b>Enlarge a plot</b><span>Press and hold shows it while your finger is down; tap opens it until you tap again. On Hard a tap always opens it, so you can drag its gate.</span></div>${seg('enlarge', [['hold', 'Press and hold'], ['tap', 'Tap']])}</div>`;
+    h += `<div class="set-row"><div><b>Timer</b><span>Shows the clock while you play and your best time per level. Times are kept either way.</span></div>${seg('timer', [[false, 'Off'], [true, 'On']])}</div>`;
     h += `<div class="set-row"><div><b>Auto-check</b><span>Marks each choice right or wrong as you make it. A wrong choice counts as a mistake.</span></div>${seg('autoCheck', [[false, 'Off'], [true, 'On']])}</div>`;
     if (S) {
       const left = S.P.pool.filter(id => !S.peeks.has(id)).length;
+      h += `<div class="set-row"><div><b>How to play</b><span>A short walk-through on this board.</span></div><button class="btn" data-tour>Show me</button></div>`;
       h += `<div class="set-row"><div><b>Reference table</b><span>${freePeeks() ? 'Already filled in on Easy.' : left ? `Fills the scratch pad from the key. Counts as ${plural(left, 'peek')}.` : 'Already filled in.'}</span></div><button class="btn" data-fill ${freePeeks() || !left ? 'disabled' : ''}>Fill in the reference table</button></div>`;
     }
     dlg.innerHTML = h;
@@ -689,21 +794,77 @@
     }
     const b = ev.target.closest('[data-pref]');
     if (b) {
-      const k = b.dataset.pref, v = k === 'autoCheck' ? b.dataset.v === 'true' : b.dataset.v;
+      const k = b.dataset.pref, v = (k === 'autoCheck' || k === 'timer') ? b.dataset.v === 'true' : b.dataset.v;
       setPref(k, v);
-      if (S) drawPanel();
+      if (S) { drawPanel(); tickTimer(); } else showMenu();
       return openSettings();
     }
     if (ev.target.closest('[data-fill]')) { fillReference(); dlg.close(); }
+    if (ev.target.closest('[data-tour]')) { dlg.close(); startTour(tourKey()); }
   });
 
   // ---------- top bar ----------
   $('#menuBtn').addEventListener('click', () => { location.hash = '/'; });
   $('#newBtn').addEventListener('click', () => play(S.mode, S.level));
   $('#hintBtn').addEventListener('click', hint);
+  $('#undoBtn').addEventListener('click', undo);
   $('#setBtn').addEventListener('click', openSettings);
   addEventListener('resize', () => { if (S) fitPlots(); });
   addEventListener('hashchange', route);
+  // ---------- guided first board: coach marks over the real board, once per kind (Settings → How to play) ----------
+  const tourKey = () => gating() ? 'gating' : S.mode;
+  const TOURS = {
+    pops: [
+      ['#plots', 'Every population in this tube has its own shape and letter, the same in every plot. The dashed lines split negative from positive: read which side each letter sits on.'],
+      ['.lgrid', 'Rows are the populations; columns are identities, with decoys mixed in and none used twice. Tap a cell once to rule it out, twice to choose it.'],
+      ['.tabs', 'The Scratch pad sorts each identity\'s markers. On Easy it comes filled in; on harder levels you fill it from memory, and the eye reveals a row as a peek.'],
+      ['#hintBtn', 'Stuck? Hint makes one logical step and says why. Undo takes back your last move.'],
+      ['.actions', 'Check when every row has a choice. Each wrong one counts as a mistake. After solving, Why? replays the plots that decided each population.'],
+    ],
+    clone: [
+      ['#plots', 'One population is outlined; the rest of the tube is faded background. Read the outlined one on every plot: which side of each dashed line is it?'],
+      ['#panel .tabbody', 'These are look-alike neoplasms. Tap one once to rule it out, twice to choose it. "pad" jumps to its markers in the Scratch pad.'],
+      ['#hintBtn', 'Stuck? Hint rules one out and says which plot did it. Undo takes back your last move.'],
+      ['.actions', 'Diagnose when one is left. After solving, Why? replays the plots that ruled each one out.'],
+    ],
+    gating: [
+      ['#plots', 'On Hard and Extreme nothing is labeled: every event starts gray, and each plot has a gate (a crosshair; two side-scatter lines on FSC/SSC).'],
+      ['#plots figure:nth-child(2)', 'Drag a gate into the gaps between clusters. Tap a plot to open it large for finer dragging.'],
+      ['.gstat, .gpick', 'Events sort themselves into lettered groups across every plot. Aim for one clean group per population: a line through a cluster splits it, a line on the wrong side merges two.'],
+      ['#panel .tabbody', 'Then name the groups (or pick the abnormal one and diagnose it), as on the other levels.'],
+      ['#hintBtn', 'Hint moves a misplaced gate into the gap first, then helps you name. Undo takes back a gate move.'],
+    ],
+  };
+  let tour = null;
+  function startTour(key) {
+    if (!S) return;
+    S.tab = 'answer'; S.sheet = 'open'; drawPanel();
+    tour = { key, i: 0, steps: TOURS[key].filter(([sel]) => document.querySelector(sel)) };
+    showTourStep();
+  }
+  function endTour() {
+    if (tour) { prefs.tours[tour.key] = true; setPref('tours', prefs.tours); }
+    tour = null; const c = $('#coach'); c.hidden = true; c.innerHTML = '';
+  }
+  function showTourStep() {
+    const c = $('#coach'); if (!tour) return;
+    const [sel, text] = tour.steps[tour.i], el = document.querySelector(sel);
+    if (!el) return endTour();
+    el.scrollIntoView({ block: 'nearest' });
+    const r = el.getBoundingClientRect(), pad = 6, last = tour.i === tour.steps.length - 1;
+    const below = r.top + r.height / 2 < innerHeight / 2;
+    c.innerHTML = `<div class="coach-spot" style="left:${r.left - pad}px;top:${r.top - pad}px;width:${r.width + 2 * pad}px;height:${r.height + 2 * pad}px"></div>
+      <div class="coach-card card" style="${below ? 'bottom' : 'top'}:max(16px, env(safe-area-inset-${below ? 'bottom' : 'top'}))" role="dialog" aria-label="How to play">
+      <p>${text}</p><div class="actions"><span class="tally">${tour.i + 1} of ${tour.steps.length}</span><button class="btn mini" data-tskip>${last ? 'Close' : 'Skip'}</button>${tour.i ? '<button class="btn mini" data-tback>Back</button>' : ''}${last ? '<button class="btn mini primary" data-tdone>Got it</button>' : '<button class="btn mini primary" data-tnext>Next</button>'}</div></div>`;
+    c.hidden = false;
+  }
+  $('#coach').addEventListener('click', ev => {
+    if (ev.target.closest('[data-tnext]')) { tour.i++; return showTourStep(); }
+    if (ev.target.closest('[data-tback]')) { tour.i--; return showTourStep(); }
+    if (ev.target.closest('[data-tskip], [data-tdone]')) return endTour();
+  });
+  addEventListener('resize', () => { if (tour) showTourStep(); });
+
   FC.state = () => S; // for tests and the console
   applyTheme();
   route();

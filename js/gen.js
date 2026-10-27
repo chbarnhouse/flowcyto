@@ -71,7 +71,8 @@
   const LEVELS = {
     easy: { label: 'Easy', spread: 1, pops: 3, decoys: 2, dx: 3, clone: 0.7, extra: 2, herring: 0, pct: false, wantMatching: false },
     medium: { label: 'Medium', spread: 1.18, pops: 4, decoys: 3, dx: 4, cloneMin: 2, clone: 1, extra: 0, herring: 0, pct: false, wantMatching: true },
-    hard: { label: 'Hard', spread: 1.45, gating: true, pops: 5, decoys: 4, dx: 5, cloneMin: 2, clone: 1, extra: 0, herring: 1, pct: true, wantMatching: true },
+    hard: { label: 'Hard', spread: 1.12, gating: true, pops: 4, decoys: 3, dx: 4, cloneMin: 2, clone: 1, extra: 0, herring: 0, pct: false, wantMatching: true },
+    extreme: { label: 'Extreme', spread: 1.45, gating: true, pops: 5, decoys: 4, dx: 5, cloneMin: 2, clone: 1, extra: 0, herring: 1, pct: true, wantMatching: true },
   };
 
   const ALL_MARKERS = markersOf(PLOTS);

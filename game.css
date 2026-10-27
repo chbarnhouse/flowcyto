@@ -19,7 +19,7 @@
 .micon svg { width: 100%; height: 100%; }
 .mhead h2 { font-size: var(--fs-xl); }
 .mcard > p { margin: 8px 0 14px; color: var(--ink-2); font-size: var(--fs-sm); }
-.lvls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.lvls { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .lvl { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 6px; border: 1.5px solid var(--line); border-radius: 12px; background: var(--sunk); cursor: pointer; }
 .lvl b { font-size: var(--fs-lg); }
 .lvl span { font-size: var(--fs-xs); color: var(--muted); font-weight: 600; }
@@ -138,12 +138,40 @@
 .theme-sw i { display: block; height: 6px; width: 70%; border-radius: 3px; }
 .board-head .pill { white-space: nowrap; }
 
+/* ---------- daily boards, timer, why replay, coach marks ---------- */
+.daily { padding: 16px 18px; }
+.dhead { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.dhead h2 { font-size: var(--fs-xl); }
+.streak { font-size: var(--fs-sm); font-weight: 800; color: var(--blue); }
+.daily > p { margin: 6px 0 12px; color: var(--ink-2); font-size: var(--fs-sm); }
+.dbtns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.dbtn { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 10px; align-items: center; text-align: left; padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 12px; background: var(--sunk); cursor: pointer; }
+.dbtn .micon { grid-row: 1 / 3; width: 28px; height: 28px; }
+.dbtn b { font-size: var(--fs-sm); }
+.dbtn span:last-child { display: inline-flex; gap: 4px; align-items: center; font-size: var(--fs-xs); color: var(--muted); font-weight: 600; }
+.dbtn.done { border-color: var(--teal); }
+.dbtn:hover { border-color: var(--blue); }
+.timer { font-variant-numeric: tabular-nums; }
+.btn.mini { min-height: 26px; padding: 2px 10px; font-size: var(--fs-xs); }
+.recap .item .btn.mini { margin-left: 4px; }
+.whyhead { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.whybox p { margin: 6px 0 0; }
+.coach { position: fixed; inset: 0; z-index: 30; }
+.coach-spot { position: fixed; border-radius: 12px; border: 3px solid var(--blue); box-shadow: 0 0 0 9999px rgba(10,12,16,.55); pointer-events: none; transition: all .18s ease; }
+.coach-card { position: fixed; left: 50%; transform: translateX(-50%); width: min(460px, calc(100vw - 24px)); padding: 14px 16px; }
+.coach-card p { margin: 0 0 4px; font-size: var(--fs-md); }
+.coach-card .actions { justify-content: flex-end; margin-bottom: 0; }
+.coach-card .actions .tally { margin-right: auto; }
+
 /* ---------- phones and narrow tablets: plots above, the panel as a bottom sheet ---------- */
 @media (max-width: 900px) {
   .bar-in { padding: 6px 8px; gap: 2px; }
   .iconbtn { padding: 6px 8px; }
   .iconbtn span { display: none; }
   #hintBtn span { display: inline; }
+  .lvl { padding: 10px 2px; }
+  .lvl b { font-size: var(--fs-md); }
+  .dbtns { grid-template-columns: 1fr; }
   #newBtn { min-height: 34px; padding: 4px 12px; }
   #newBtn .wide { display: none; }
   .board { flex-direction: column; padding: 8px 8px 0; gap: 8px; }
