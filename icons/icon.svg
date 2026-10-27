@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a72c2"/><stop offset="1" stop-color="#174e8c"/></linearGradient></defs>
+  <rect width="1024" height="1024" fill="url(#g)"/>
+  <!-- the logo glyph: a dot-plot frame, a dashed quad gate, a circle population and a triangle population -->
+  <rect x="212" y="212" width="600" height="600" rx="110" fill="none" stroke="#fff" stroke-width="44"/>
+  <path d="M512 262v500M262 512h500" stroke="#fff" stroke-opacity=".7" stroke-width="22" stroke-dasharray="44 40" stroke-linecap="round"/>
+  <circle cx="370" cy="654" r="74" fill="#fff"/>
+  <path d="M654 300l78 128h-156z" fill="#fff" stroke="#fff" stroke-width="18" stroke-linejoin="round"/>
+</svg>

@@ -63,7 +63,7 @@
     $('#game').hidden = true; $('#menu').hidden = false;
     document.title = 'FlowCyto';
     const stats = load('flowcyto.stats', {}), cur = load('flowcyto.current', null);
-    let h = `<main class="menu-in"><div class="logo on-page"><svg width="56" height="56" viewBox="0 0 22 22" aria-hidden="true"><rect x="1" y="1" width="20" height="20" rx="5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M11 3v16M3 11h16" stroke="currentColor" stroke-width="1" stroke-dasharray="2 2"/><circle cx="7" cy="15" r="2.2" fill="currentColor"/><path d="M15 4.6l2.2 3.6h-4.4z" fill="var(--orange)"/></svg><div><h1>FlowCyto</h1><p>Flow cytometry logic puzzles for STEP 1</p></div></div>`;
+    let h = `<main class="menu-in"><div class="logo on-page"><svg width="56" height="56" viewBox="0 0 22 22" aria-hidden="true"><rect x="1" y="1" width="20" height="20" rx="5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M11 3v16M3 11h16" stroke="currentColor" stroke-width="1" stroke-dasharray="2 2"/><circle cx="7" cy="15" r="2.2" fill="currentColor"/><path d="M15 4.6l2.2 3.6h-4.4z" fill="currentColor"/></svg><div><h1>FlowCyto</h1><p>Flow cytometry logic puzzles for STEP 1</p></div></div>`;
     if (cur && cur.phase !== 'done') {
       h += `<button class="card cont" data-continue><span class="cont-k">Continue</span><b>${esc(MODES[cur.mode].name)}</b><span>${LEVELS[cur.level].label} · board ${cur.seed} · ${plural(cur.wrongChecks || 0, 'mistake')}</span><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`;
     }

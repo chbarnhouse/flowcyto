@@ -23,7 +23,7 @@ echo "==> Checking every board still has one answer"
 node tools/check.js 60 >/dev/null || { echo "!! deploy stopped: tools/check.js failed" >&2; exit 1; }
 
 echo "==> Packing"
-COPYFILE_DISABLE=1 tar czf "$STAGE/flowcyto.tgz" --no-xattrs index.html style.css game.css favicon.svg js
+COPYFILE_DISABLE=1 tar czf "$STAGE/flowcyto.tgz" --no-xattrs index.html style.css game.css favicon.svg apple-touch-icon.png manifest.webmanifest icons js
 $SCP -q "$STAGE/flowcyto.tgz" "$PVE_HOST:/tmp/flowcyto.tgz"
 
 echo "==> Installing into CT $CTID:$APPDIR"
