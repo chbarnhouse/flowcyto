@@ -2,18 +2,16 @@
 
 A flow cytometry logic puzzle for STEP 1, a companion to Step 1 Pathways. Read the dot plots, name the populations, and find the clone. Every board is generated and has exactly one answer that logic can reach.
 
-**Modes:**
-- **Name every population**: a logic grid. Give each lettered population an identity. Decoys are mixed in, and no identity is used twice.
-- **Diagnose the clone**: one abnormal population against a list of look-alike neoplasms.
+**How a board plays:** first the **scratchpad**: give every population in the tube an identity (normal cell types, plus "Abnormal (clone)"; no identity is used twice). Then the **diagnosis**: name the clone. The **reference** lists each cell type's markers.
 
 **Levels:**
-- **Easy:** just the plots and cell types you need; the reference is filled in.
-- **Medium:** extra plots and a few cell types that aren't in the tube; reference filled in.
-- **Hard:** like Medium, but you fill in a scratch pad instead of a reference.
+- **Easy:** just the plots and cell types you need; reference filled in; diagnosis from 4.
+- **Medium:** extra plots and absent cell types; reference filled in; diagnosis from 4.
+- **Hard:** you fill in the reference; diagnosis from every neoplasm.
 - **Expert:** no labels: you place every quad gate, and the events sort themselves into lettered groups.
-- **Master:** gates, extra plots, absent cell types, and populations that touch.
-- **Extreme:** gates, and you choose which cell types to consider from the whole catalog, plus a share-of-events question.
-- **Custom:** set each of these yourself.
+- **Master:** gates, extra plots, absent cell types, populations that touch.
+- **Extreme:** gates, you choose the scratchpad's cell types, and you type the diagnosis (full names or common abbreviations), plus a share-of-events question.
+- **Custom:** set each of these yourself, including turning the scratchpad or the diagnosis off.
 
 ## Run it
 Static files with no build step and no dependencies:

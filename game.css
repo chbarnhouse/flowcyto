@@ -198,7 +198,38 @@
 .field select { min-height: 44px; border: 1.5px solid var(--line); border-radius: 10px; padding: 0 10px; font: inherit; font-size: 16px; background: var(--card); color: var(--ink); }
 .actions.end { justify-content: flex-end; }
 
-/* ---------- daily boards, timer, why replay, coach marks ---------- */
+/* ---------- menu: level tiles that fill the screen ---------- */
+.menu-in { min-height: 100vh; min-height: 100dvh; max-width: 980px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+.tiles { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, minmax(132px, 1fr)) auto; gap: 12px; }
+.tile { display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 6px; text-align: left; padding: 16px; cursor: pointer; border: 1.5px solid var(--line); }
+.tile b { font-size: var(--fs-2xl); font-weight: 800; color: var(--blue); }
+.tile .tnote { font-size: var(--fs-sm); color: var(--ink-2); flex: 1; }
+.tile .tstat { font-size: var(--fs-xs); font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.tile:hover, .tile:focus-visible { border-color: var(--blue); }
+.tile.custom { grid-column: 1 / -1; border-style: dashed; min-height: 0; justify-content: flex-start; }
+.tile.custom b { font-size: var(--fs-xl); }
+@media (max-width: 700px) {
+  .tiles { grid-template-columns: 1fr 1fr; grid-template-rows: repeat(3, 1fr) auto; gap: 10px; }
+  .tile.custom { flex-direction: row; align-items: center; flex-wrap: wrap; }
+  .tile { padding: 12px 14px; }
+  .tile b { font-size: var(--fs-xl); }
+  .tile .tnote { font-size: var(--fs-xs); }
+  .logo h1 { font-size: 28px; }
+  .logo p { font-size: var(--fs-sm); }
+}
+
+/* ---------- diagnosis ---------- */
+.solved-line { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: var(--fs-xs); font-weight: 700; color: var(--ink-2); padding: 8px 10px; border: 1.5px solid var(--teal); border-radius: 10px; background: var(--teal-bg); margin-bottom: 10px; }
+.solved-line .chip { display: inline-flex; gap: 4px; align-items: center; font-weight: 600; background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; }
+.ask { font-size: var(--fs-md); font-weight: 600; margin: 0 0 10px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.dxlist.four, .dxlist.all { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.dxlist .dx { margin: 0; }
+.dxgroup h3 { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 10px 0 6px; }
+.typed { display: flex; gap: 8px; margin: 4px 0 8px; }
+.typed input { flex: 1; min-width: 0; min-height: 44px; border: 2px solid var(--blue); border-radius: 10px; padding: 0 12px; font: inherit; font-size: 17px; background: var(--card); color: var(--ink); }
+.colh.abn { color: var(--blue); font-weight: 800; }
+
+/* ---------- timer, why replay, coach marks ---------- */
 .daily { padding: 16px 18px; }
 .dhead { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .dhead h2 { font-size: var(--fs-xl); }

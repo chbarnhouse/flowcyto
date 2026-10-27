@@ -45,7 +45,7 @@
   }
   /* A partly-positive population (or identity) never rules anything in or out on that marker:
      which fraction is positive is detail, not a STEP 1 fact. */
-  const fitsOne = (eid, pop, mk) => { const a = allowed(BY[eid], mk), o = observed(pop, mk); return o === 'split' || a.includes('split') || a.includes(o); };
+  const fitsOne = (eid, pop, mk) => { if (eid === 'abn') return true; const a = allowed(BY[eid], mk), o = observed(pop, mk); return o === 'split' || a.includes('split') || a.includes(o); };
   const fits = (eid, pop, markers) => markers.every(mk => fitsOne(eid, pop, mk));
 
   /* Count assignments of populations to distinct pool identities (stops at `cap`). */
@@ -68,47 +68,48 @@
   const markersOf = plots => [...new Set(['SSC', ...plots.flatMap(plotMarkers)])].filter(mk => mk !== 'FSC'); // FSC is display-only
 
   // ---------- difficulty ----------
-  /* Each level is a set of switches (Custom builds its own):
-     pops      populations in the tube
-     decoys    identities offered beyond the ones present (0, a number, or 'all' = the whole catalog)
-     dx        Diagnose the clone: neoplasms offered (a number, or 'all')
-     extra     plots shown beyond the minimum needed (consistent with the tube, maybe useful, never required)
-     ref       'filled' reference table, or 'blank' scratch pad
+  /* One game, two steps: the **scratchpad** (give every population an identity: normal cell types plus
+     "Abnormal (clone)") and then the **diagnosis** (name the clone). Each level is a set of switches
+     (Custom builds its own):
+     pops      populations in the tube (one of them is always the clone)
+     decoys    normal cell types offered in the scratchpad beyond the ones present (0, n, or 'all')
+     extra     plots shown beyond the minimum needed (real readings, maybe useful, never required)
+     ref       'filled' reference, or 'blank' (you fill it in)
      gating    no labels: the player places a quad gate on each plot
-     choose    the answer grid starts empty: the player picks which cell types to consider
+     choose    the scratchpad starts empty: the player picks which cell types to consider
+     scratch   the scratchpad step (Custom can drop it: then the clone is outlined, or picked as a group)
+     dx        diagnosis: 'choice' (pick from 4) · 'all' (pick from every neoplasm) · 'type' · null (none)
      spread    cluster looseness (SD multiplier); pct asks what share of events the clone is */
   const LEVELS = {
-    easy: { label: 'Easy', pops: 3, decoys: 0, dx: 3, extra: 0, ref: 'filled', spread: 1, clone: 0.7, cloneMin: 1, wantMatching: false },
-    medium: { label: 'Medium', pops: 4, decoys: 2, dx: 4, extra: 2, ref: 'filled', spread: 1.1, clone: 1, cloneMin: 2, wantMatching: true },
-    hard: { label: 'Hard', pops: 4, decoys: 2, dx: 4, extra: 2, ref: 'blank', spread: 1.15, clone: 1, cloneMin: 2, wantMatching: true },
-    expert: { label: 'Expert', pops: 4, decoys: 0, dx: 3, extra: 0, ref: 'blank', gating: true, spread: 1.12, clone: 1, cloneMin: 2, wantMatching: true },
-    master: { label: 'Master', pops: 5, decoys: 3, dx: 5, extra: 2, ref: 'blank', gating: true, spread: 1.3, clone: 1, cloneMin: 2, wantMatching: true },
-    extreme: { label: 'Extreme', pops: 5, decoys: 'all', dx: 'all', extra: 2, ref: 'blank', gating: true, choose: true, spread: 1.45, pct: true, clone: 1, cloneMin: 2, wantMatching: true },
+    easy: { label: 'Easy', pops: 3, decoys: 0, extra: 0, ref: 'filled', spread: 1, dx: 'choice', scratch: true, cloneMin: 1, wantMatching: false },
+    medium: { label: 'Medium', pops: 4, decoys: 2, extra: 2, ref: 'filled', spread: 1.1, dx: 'choice', scratch: true, cloneMin: 2, wantMatching: true },
+    hard: { label: 'Hard', pops: 4, decoys: 2, extra: 2, ref: 'blank', spread: 1.15, dx: 'all', scratch: true, cloneMin: 2, wantMatching: true },
+    expert: { label: 'Expert', pops: 4, decoys: 0, extra: 0, ref: 'blank', gating: true, spread: 1.12, dx: 'all', scratch: true, cloneMin: 2, wantMatching: true },
+    master: { label: 'Master', pops: 5, decoys: 3, extra: 2, ref: 'blank', gating: true, spread: 1.3, dx: 'all', scratch: true, cloneMin: 2, wantMatching: true },
+    extreme: { label: 'Extreme', pops: 5, decoys: 'all', extra: 2, ref: 'blank', gating: true, choose: true, spread: 1.45, pct: true, dx: 'type', scratch: true, cloneMin: 2, wantMatching: true },
   };
-  /* Custom: the player's own switches (Settings on the menu's Custom card). */
+  /* Custom: the player's own switches (the menu's Custom tile). */
   function customLevel(c = {}) {
-    const decoys = c.choose ? 'all' : c.decoys ? 3 : 0;
-    return { label: 'Custom', pops: c.pops || 4, decoys, dx: c.choose ? 'all' : c.decoys ? 5 : 3, extra: c.extra ? 2 : 0, ref: c.ref || 'filled',
-      gating: !!c.gating, choose: !!c.choose, spread: { distinct: 1, normal: 1.15, touching: 1.45 }[c.spread || 'normal'], pct: !!c.pct,
-      clone: 1, cloneMin: 2, wantMatching: !!(c.decoys || c.choose) };
+    const scratch = c.scratch !== false, dx = c.dx === 'off' ? null : (c.dx || 'choice');
+    return { label: 'Custom', pops: c.pops || 4, decoys: c.choose ? 'all' : c.decoys ? 3 : 0, extra: c.extra ? 2 : 0, ref: c.ref || 'filled',
+      gating: !!c.gating, choose: !!c.choose && scratch, spread: { distinct: 1, normal: 1.15, touching: 1.45 }[c.spread || 'normal'], pct: !!c.pct,
+      dx: scratch || dx ? dx : 'choice', scratch, cloneMin: 2, wantMatching: !!(c.decoys || c.choose) };
   }
+
   const ALL_MARKERS = markersOf(PLOTS);
   const excluded = (a, b) => (BY[a].excl || []).includes(b) || (BY[b].excl || []).includes(a);
   function distance(eid, pop) { let d = 0; for (const mk of ALL_MARKERS) if (!fitsOne(eid, pop, mk)) d++; return d; }
 
-  /* mode 'pops': name every population (grid). mode 'clone': diagnose the one abnormal population
-     from a list of neoplasms; the rest of the tube is background. */
-  function generate(seed, level = 'medium', mode = 'pops', custom) {
+  function generate(seed, level = 'medium', custom) {
     const cfg = level === 'custom' ? customLevel(custom) : LEVELS[level];
-    const cloneMode = mode === 'clone';
     const r = mulberry32(seed >>> 0);
     // Pick the clone first (every neoplasm equally likely) and keep it across retries, so the
     // preference for cross-elimination boards doesn't skew which diagnoses come up.
-    const clone = (cloneMode || r() < cfg.clone) ? pick(r, ENTITIES.filter(e => e.kind === 'neoplasm')).id : null;
+    const clone = pick(r, ENTITIES.filter(e => e.kind === 'neoplasm')).id;
     for (let attempt = 0; attempt < 400; attempt++) {
-      const spec = pick(r, clone ? SPECIMENS.filter(s => s.clones.includes(clone)) : SPECIMENS);
-      const normals = shuffle(r, spec.normals).filter(id => !clone || !excluded(id, clone)).slice(0, cfg.pops - (clone ? 1 : 0));
-      const ids = clone ? [...normals, clone] : normals;
+      const spec = pick(r, SPECIMENS.filter(s => s.clones.includes(clone)));
+      const normals = shuffle(r, spec.normals).filter(id => !excluded(id, clone)).slice(0, cfg.pops - 1);
+      const ids = [...normals, clone];
       if (ids.length < cfg.pops) continue;
       const pops = ids.map(id => ({ id, lc: allowed(BY[id], 'LC')[0] }));
       for (const p of pops) {
@@ -116,63 +117,76 @@
         p.res = {};
         for (const [mk, lvl] of Object.entries(BY[p.id].m)) if (lvl === 'var') p.res[mk] = r() < 0.5 ? 'pos' : 'neg';
       }
+      const cp = pops.find(p => p.id === clone);
+      const near = (cands, to) => cands.map(e => ({ id: e.id, raw: Math.min(...to.map(p => distance(e.id, p))) })).filter(x => x.raw >= 1)
+        .map(x => ({ id: x.id, d: x.raw + r() * 1.5 })).sort((a, b) => a.d - b.d);
 
-      // Decoys: identities that differ from some population on only a few markers (never zero).
-      const others = ENTITIES.filter(e => !ids.includes(e.id) && ids.every(id => !excluded(id, e.id)))
-        .map(e => ({ id: e.id, raw: Math.min(...pops.map(p => distance(e.id, p))) }))
-        .filter(x => x.raw >= 1).map(x => ({ id: x.id, d: x.raw + r() * 1.5 })).sort((a, b) => a.d - b.d);
-      // Half come from the clone's own lineage (its real look-alikes), the rest from the closest.
-      const lin = clone ? shuffle(r, others.filter(x => BY[x.id].lineage === BY[clone].lineage)).slice(0, Math.ceil(cfg.decoys / 2)) : [];
-      const rest = shuffle(r, others.filter(x => !lin.includes(x)).slice(0, cfg.decoys * 2));
-      let decoys = cfg.decoys === 'all' ? others.map(x => x.id) : [...lin, ...rest].slice(0, cfg.decoys).map(x => x.id);
-      const cp = clone && pops.find(p => p.id === clone);
-      if (cloneMode) {
-        // Other neoplasms, the clone's lineage first, closest look-alikes before far ones.
-        const neo = ENTITIES.filter(e => e.kind === 'neoplasm' && e.id !== clone && !excluded(e.id, clone) && distance(e.id, cp) >= 1)
-          .map(e => ({ id: e.id, d: distance(e.id, cp) + r() * 1.5 + (e.lineage === BY[clone].lineage ? 0 : 4) }))
-          .sort((a, b) => a.d - b.d);
-        decoys = cfg.dx === 'all' ? neo.map(x => x.id) : shuffle(r, neo.slice(0, cfg.dx + 2)).slice(0, cfg.dx).map(x => x.id);
+      // Scratchpad choices. With a diagnosis step, the clone is "Abnormal (clone)" and the decoys are
+      // normal cell types; without one, the scratchpad names the neoplasm itself (with look-alikes).
+      let pool = [];
+      if (cfg.scratch) {
+        const ok = e => !ids.includes(e.id) && ids.every(id => !excluded(id, e.id));
+        if (cfg.dx) {
+          const others = near(ENTITIES.filter(e => e.kind === 'normal' && ok(e)), pops);
+          const decoys = cfg.decoys === 'all' ? others.map(x => x.id) : shuffle(r, others.slice(0, cfg.decoys * 2)).slice(0, cfg.decoys).map(x => x.id);
+          pool = shuffle(r, [...normals, 'abn', ...decoys]);
+        } else {
+          const others = near(ENTITIES.filter(ok), pops);
+          const lin = shuffle(r, others.filter(x => BY[x.id].lineage === BY[clone].lineage)).slice(0, Math.ceil(cfg.decoys / 2));
+          const rest = shuffle(r, others.filter(x => !lin.includes(x)).slice(0, cfg.decoys * 2));
+          const decoys = cfg.decoys === 'all' ? others.map(x => x.id) : [...lin, ...rest].slice(0, cfg.decoys).map(x => x.id);
+          pool = shuffle(r, [...ids, ...decoys]);
+        }
       }
-      const pool = shuffle(r, cloneMode ? [clone, ...decoys] : [...ids, ...decoys]);
-      const unique = plots => cloneMode
-        ? pool.filter(id => fits(id, cp, markersOf(plots))).length === 1
-        : countSolutions(pops, pool, markersOf(plots)).n === 1;
+      // Diagnosis choices: the clone and 3 look-alikes (its lineage first), or every neoplasm.
+      let dxPool = [];
+      if (cfg.dx) {
+        const neo = ENTITIES.filter(e => e.kind === 'neoplasm' && e.id !== clone && !excluded(e.id, clone) && distance(e.id, cp) >= 1)
+          .map(e => ({ id: e.id, d: distance(e.id, cp) + r() * 1.5 + (e.lineage === BY[clone].lineage ? 0 : 4) })).sort((a, b) => a.d - b.d);
+        dxPool = cfg.dx === 'choice' ? shuffle(r, [clone, ...shuffle(r, neo.slice(0, 5)).slice(0, 3).map(x => x.id)]) : [clone, ...neo.map(x => x.id)];
+      }
+      const unique = plots => {
+        const mk = markersOf(plots);
+        if (cfg.scratch && countSolutions(pops, pool, mk).n !== 1) return false;
+        if (cfg.dx && dxPool.filter(id => fits(id, cp, mk)).length !== 1) return false;
+        return true;
+      };
 
       const candidates = PLOTS.filter(p => !(p[0] === 'FSC' && p[1] === 'SSC'));
       if (!unique(candidates)) continue;
 
-      // Pin one plot of the clone's hallmarks — preferring one that tells it from a pool look-alike.
-      const hall = clone ? candidates.filter(p => plotMarkers(p).some(mk => BY[clone].key.includes(mk))) : [];
-      const telling = hall.filter(p => pool.some(id => id !== clone && !fits(id, cp, plotMarkers(p))));
+      // Pin one plot of the clone's hallmarks: preferring one that tells it from a look-alike on offer.
+      const rivals = cfg.dx ? dxPool : pool;
+      const hall = candidates.filter(p => plotMarkers(p).some(mk => BY[clone].key.includes(mk)));
+      const telling = hall.filter(p => rivals.some(id => id !== clone && id !== 'abn' && !fits(id, cp, plotMarkers(p))));
       const pinned = (telling.length ? pick(r, telling) : hall.length ? pick(r, hall) : null);
-      const informs = q => pool.some(id => id !== clone && !fits(id, cp, plotMarkers(q)));
+      const informs = q => rivals.some(id => id !== clone && id !== 'abn' && !fits(id, cp, plotMarkers(q)));
       // Sudoku-style clue removal.
       let shown = candidates.slice();
       for (const p of shuffle(r, candidates)) {
         if (p === pinned) continue;
         const trial = shown.filter(q => q !== p);
-        // Diagnose-the-clone Medium keeps at least cloneMin marker plots that bear on the clone.
-        if (cloneMode && cfg.cloneMin && trial.filter(q => informs(q)).length < cfg.cloneMin) continue;
+        // the diagnosis keeps at least cloneMin marker plots that bear on the clone
+        if (cfg.dx && cfg.cloneMin && trial.filter(q => informs(q)).length < cfg.cloneMin) continue;
         if (unique(trial)) shown = trial;
       }
-      const needsMatching = !cloneMode && countSolutions(pops, pool, markersOf(shown)).cand.some(c => c.length > 1);
-      if (!cloneMode && cfg.wantMatching && !needsMatching && attempt < 60) continue;
+      const needsMatching = cfg.scratch && countSolutions(pops, pool, markersOf(shown)).cand.some(c => c.filter(x => x !== 'abn').length > 1);
+      if (cfg.scratch && cfg.wantMatching && !needsMatching && attempt < 60) continue;
 
       const unused = shuffle(r, candidates.filter(p => !shown.includes(p)));
       // Extra plots: real readings of this tube that aren't needed. Half show something positive (they
       // look useful), the rest are aimed at an identity on offer that isn't here (a red herring).
-      const extras = [];
-      const showsSomething = p => plotMarkers(p).some(mk => (cloneMode ? [cp] : pops).some(q => !['neg', 'none'].includes(observed(q, mk))));
-      const lure = p => { const mks = plotMarkers(p); return mks.every(mk => pops.every(q => ['neg', 'none'].includes(observed(q, mk)))) && decoys.some(d => mks.some(mk => !['neg', 'none'].includes(allowed(BY[d], mk)[0]))); };
+      const extras = [], offered = [...pool, ...dxPool].filter(id => id !== 'abn' && !ids.includes(id));
+      const showsSomething = p => plotMarkers(p).some(mk => pops.some(q => !['neg', 'none'].includes(observed(q, mk))));
+      const lure = p => { const mks = plotMarkers(p); return mks.every(mk => pops.every(q => ['neg', 'none'].includes(observed(q, mk)))) && offered.some(d => mks.some(mk => !['neg', 'none'].includes(allowed(BY[d], mk)[0]))); };
       for (const p of unused) { if (extras.length >= Math.ceil(cfg.extra / 2)) break; if (showsSomething(p)) extras.push(p); }
       for (const p of unused) { if (extras.length >= cfg.extra) break; if (!extras.includes(p) && lure(p)) extras.push(p); }
       for (const p of unused) { if (extras.length >= cfg.extra) break; if (!extras.includes(p)) extras.push(p); }
-      const herrings = [];
 
-      // Hard boards are gated by the player, so every pair of populations must be separable by quad
-      // gates on the plots shown. If two can't be told apart, add the plot that splits them.
+      // Gated boards: every pair of populations must be separable by quad gates on the plots shown.
+      // If two can't be told apart, add the plot that splits them.
       if (cfg.gating) {
-        let all = [...shown, ...extras, ...herrings], guard = 0;
+        let all = [...shown, ...extras], guard = 0;
         while (collisions(pops, all) && guard++ < 6) {
           const fix = unused.filter(p => !all.includes(p)).map(p => ({ p, c: collisions(pops, [...all, p]) })).sort((a, b) => a.c - b.c)[0];
           if (!fix || fix.c >= collisions(pops, all)) break;
@@ -186,22 +200,23 @@
       const tot = w.reduce((a, b) => a + b, 0);
       pops.forEach((p, i) => { p.frac = w[i] / tot; });
 
-      const order = [['FSC', 'SSC'], ...PLOTS.filter(p => shown.includes(p) || extras.includes(p) || herrings.includes(p))];
+      const order = [['FSC', 'SSC'], ...PLOTS.filter(p => shown.includes(p) || extras.includes(p))];
       const letters = shuffle(r, pops);
       letters.forEach((p, i) => { p.label = 'ABCDE'[i]; p.slot = i; });
+      const answer = id => (cfg.dx && id === clone) ? 'abn' : id; // what the scratchpad calls each population
 
       const puzzle = {
-        seed: seed >>> 0, level, mode, target: cp ? cp.label : null, spec: spec.id, specName: spec.name,
-        pops: letters, pool, choose: !!cfg.choose, cfg, plots: order.map(p => ({ x: p[0], y: p[1], key: plotKey(p), role: extras.includes(p) ? 'extra' : 'clue' })),
-        needsMatching, solution: Object.fromEntries(letters.map(p => [p.label, p.id])),
+        seed: seed >>> 0, level, cfg, target: cp.label, clone, spec: spec.id, specName: spec.name,
+        pops: letters, pool, dxPool, choose: !!cfg.choose,
+        plots: order.map(p => ({ x: p[0], y: p[1], key: plotKey(p), role: extras.includes(p) ? 'extra' : 'clue' })),
+        needsMatching, solution: Object.fromEntries(letters.map(p => [p.label, answer(p.id)])),
       };
       if (cfg.pct) {
-        const target = letters.find(p => BY[p.id].kind === 'neoplasm') || pick(r, letters);
-        const ans = Math.round(target.frac * 100);
+        const ans = Math.round(cp.frac * 100);
         const opts = new Set([ans]);
         const steps = shuffle(r, [-30, -20, -12, 12, 20, 30]);
         for (const s of steps) { const v = ans + s; if (v >= 2 && v <= 95 && [...opts].every(o => Math.abs(o - v) >= 9)) opts.add(v); if (opts.size >= 4) break; }
-        puzzle.pct = { label: target.label, answer: ans, options: [...opts].sort((a, b) => a - b) };
+        puzzle.pct = { label: cp.label, answer: ans, options: [...opts].sort((a, b) => a - b) };
       }
       puzzle.events = simulate(puzzle, mulberry32((seed ^ 0x9e3779b9) >>> 0));
       return puzzle;
