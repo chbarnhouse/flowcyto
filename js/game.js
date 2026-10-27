@@ -118,7 +118,7 @@
     const stats = load('flowcyto.stats', {}), cur = load('flowcyto.current', null);
     let h = `<main class="menu-in"><div class="menu-top"><div class="logo on-page"><svg width="52" height="52" viewBox="0 0 22 22" aria-hidden="true"><rect x="1" y="1" width="20" height="20" rx="5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M11 3v16M3 11h16" stroke="currentColor" stroke-width="1" stroke-dasharray="2 2"/><circle cx="7" cy="15" r="2.2" fill="currentColor"/><path d="M15 4.6l2.2 3.6h-4.4z" fill="currentColor"/></svg><div><h1>FlowCyto</h1><p>Flow cytometry logic puzzles for STEP 1</p></div></div><button class="gearbtn" data-settings aria-label="Settings" title="Settings">${ICON.gear}</button></div>`;
     if (cur && cur.phase !== 'done' && LEVEL_KEYS.includes(cur.level)) {
-      h += `<button class="card cont" data-continue><span class="cont-k">Continue</span><b>${levelLabel(cur.level)}</b><span>board ${cur.seed} · ${plural(cur.wrongChecks || 0, 'mistake')}</span>${ICON.next}</button>`;
+      h += `<button class="card cont" data-continue><span class="cont-k">Continue</span><b>${levelLabel(cur.level)}</b><span>${cur.phase === 'dx' ? 'Diagnosis' : 'Scratchpad'} · ${plural(cur.wrongChecks || 0, 'mistake')}</span>${ICON.next}</button>`;
     }
     h += '<div class="tiles">';
     for (const [l, L] of Object.entries(LEVELS)) {
@@ -181,7 +181,7 @@
     if (location.hash.slice(1) !== `${level}/${seed}`) history.replaceState(null, '', `#${level}/${seed}`);
     $('#menu').hidden = true; $('#game').hidden = false;
     $('#gMode').innerHTML = `<span class="long">${levelLabel(level)}</span><span class="short">${levelLabel(level)}</span>`;
-    $('#gLevel').textContent = `board ${seed}`;
+    $('#gLevel').textContent = '';
     $('#specName').textContent = P.specName;
     $('#boardId').hidden = true;
     document.title = `FlowCyto · ${levelLabel(level)}`;
@@ -197,7 +197,7 @@
   function resumeTimer() { if (active() && !document.hidden && S.t0 == null) S.t0 = performance.now(); }
   function tickTimer() {
     const t = $('#timer'); if (!S) return;
-    t.hidden = !prefs.timer; if (prefs.timer) t.textContent = ' · ' + fmtTime(elapsedNow());
+    t.hidden = !prefs.timer; if (prefs.timer) t.textContent = fmtTime(elapsedNow());
   }
   setInterval(tickTimer, 1000);
   document.addEventListener('visibilitychange', () => { if (!S) return; if (document.hidden) { pauseTimer(); persist(); } else resumeTimer(); });
@@ -442,7 +442,10 @@
   let holdKind = null, latched = false;
   function startHold(kind) {
     holdKind = kind; latched = false;
-    latchEl.innerHTML = `${ICON.unlock}<span>Slide here to keep it open</span>`;
+    // the target sits over the top bar: the one place that covers no plot, grid or reference
+    const r = $('.bar').getBoundingClientRect();
+    Object.assign(latchEl.style, { top: r.top + 'px', height: r.height + 'px' });
+    latchEl.innerHTML = `${ICON.unlock}<span>Slide up here to keep it open</span>`;
     latchEl.classList.remove('on'); latchEl.hidden = false;
   }
   function overLatch(ev) {
@@ -451,7 +454,7 @@
   }
   addEventListener('pointermove', ev => {
     if (!holdKind || latched || latchEl.hidden || !overLatch(ev)) return;
-    latched = true; latchEl.classList.add('on'); latchEl.innerHTML = `${ICON.lock}<span>Kept open</span>`;
+    latched = true; latchEl.classList.add('on'); latchEl.innerHTML = `${ICON.lock}<span>Kept open: let go</span>`;
     if (navigator.vibrate) navigator.vibrate(10);
   });
   // Ends a hold: closes the view, unless it was latched (then it behaves as if opened by a tap).
@@ -1005,7 +1008,10 @@
   const gatesLive = () => gating() && (S.phase === 'play' || (S.phase === 'dx' && !S.cfg.scratch));
   function openZoom(i) {
     zoomI = i; zoomAt = performance.now();
-    const pl = S.P.plots[i], size = Math.floor(Math.min(innerWidth - 24, innerHeight - (gatesLive() ? 130 : 90), 640));
+    // the enlarged plot covers the plot area only: the scratchpad and reference stay in view
+    const area = $('.plots-col').getBoundingClientRect();
+    Object.assign(zoom.style, { left: area.left + 'px', top: area.top + 'px', width: area.width + 'px', height: area.height + 'px' });
+    const pl = S.P.plots[i], size = Math.floor(Math.max(140, Math.min(area.width - 28, area.height - (gatesLive() ? 96 : 56), 640)));
     const tail = gatesLive() ? `<div class="zoom-foot"><span>${S.gates[i] ? 'Drag to move the gate' : 'Drag to place a gate'}${isFscSsc(pl) ? ' (two side-scatter lines)' : ''}</span><button class="btn primary" data-done>Done</button></div>` : '';
     zoom.innerHTML = `<figure data-zplot="${i}">${renderPlot(S.P, pl, plotOpts(i, true))}<figcaption>${plotName(pl)}${!gatesLive() && (prefs.enlarge === 'tap' || gating() || zoomLatched) ? ' · tap to close' : held ? ' · let go to close' : ''}</figcaption>${tail}</figure>`;
     zoom.style.setProperty('--zoom', size + 'px');
@@ -1059,7 +1065,11 @@
   zoom.addEventListener('pointermove', ev => { if (drag && drag.zoom) moveGate(drag, ev); });
   zoom.addEventListener('pointerup', () => { if (drag && drag.zoom) { drag = null; if (zoomI != null) openZoom(zoomI); } });
   const release = () => { clearTimeout(holdTimer); if (holdKind) endHold(); else if (held) { held = false; closeZoom(); } };
-  addEventListener('pointerup', release); addEventListener('pointercancel', release);
+  /* A hold ends however the touch ends: iOS can finish a long press without a pointerup (a system
+     gesture takes it), so touchend / touchcancel, a mouse release, losing focus and hiding the app all
+     end it too. A held view can't outlive the finger. */
+  for (const t of ['pointerup', 'pointercancel', 'touchend', 'touchcancel', 'mouseup', 'blur']) addEventListener(t, release, true);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) release(); });
   $('#plots').addEventListener('click', ev => { const f = ev.target.closest('[data-plot]'); if (f && !gating() && prefs.enlarge === 'tap') openZoom(+f.dataset.plot); });
   $('#plots').addEventListener('contextmenu', ev => ev.preventDefault());
   zoom.addEventListener('click', ev => {
