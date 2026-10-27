@@ -216,11 +216,14 @@ html.in-game, html.in-game body { background: var(--card); }
 .tile .tnote { font-size: var(--fs-sm); color: var(--ink-2); flex: 1; }
 .tile .tstat { font-size: var(--fs-xs); font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
 .tile:hover, .tile:focus-visible { border-color: var(--blue); }
-.tile.custom { grid-column: 1 / -1; min-height: 0; justify-content: center; }
+.tile.custom { grid-column: span 2; min-height: 0; justify-content: center; }
+.tile.markers { grid-column: span 1; border-color: var(--teal); background: var(--teal-bg); }
+.tile.markers b { color: var(--teal); }
 .tile.custom b { font-size: var(--fs-xl); }
 @media (max-width: 700px) {
   .tiles { grid-template-columns: 1fr 1fr; grid-template-rows: repeat(3, 2fr) 1fr; gap: 10px; }
-  .tile.custom { flex-direction: row; align-items: center; flex-wrap: wrap; }
+  .tile.custom { grid-column: span 1; flex-direction: row; align-items: center; flex-wrap: wrap; }
+  .tile.custom .tnote { display: none; }
   .tile { padding: 12px 14px; }
   .tile b { font-size: var(--fs-xl); }
   .tile .tnote { font-size: var(--fs-xs); }
@@ -320,3 +323,50 @@ html.holdmode .plots figure, html.holdmode #refBtn { touch-action: none; }
 .latch.on .ic { color: var(--orange); border-style: solid; }
 .latch.on span { color: #ffffff; }
 .refpane.held .refpane-in { border-top-color: var(--orange); }
+
+/* ---------- Markers quiz ---------- */
+.quiz .gtitle span { font-variant-numeric: tabular-nums; }
+.qmain { flex: 1; min-height: 0; overflow: auto; width: 100%; max-width: 620px; margin: 0 auto; padding: 16px 16px calc(20px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 14px; }
+.qcard { padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+.qcard h2 { margin: 0; font-size: var(--fs-2xl); color: var(--teal); }
+.qcard .sub { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
+.qchips { display: flex; flex-direction: column; gap: 8px; }
+.qchip, .qopt { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 8px 14px; border: 1.5px solid var(--line); border-radius: 12px; background: var(--card); color: var(--ink); font: inherit; font-weight: 600; font-size: var(--fs-sm); text-align: left; cursor: pointer; }
+.qchip .ic, .qopt .ic { width: 18px; height: 18px; flex: none; border: 1.5px solid var(--line); border-radius: 5px; padding: 1px; }
+.qchip[aria-pressed="true"], .qopt.on { border-color: var(--blue); background: var(--blue-bg); }
+.qchip[aria-pressed="true"] .ic, .qopt.on .ic { border-color: var(--blue); color: var(--blue); }
+.qrow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: var(--fs-sm); }
+.btn.big { min-height: 50px; justify-content: center; font-size: var(--fs-md); }
+.qkind { font-size: var(--fs-xs); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.qbig { font-size: var(--fs-2xl); font-weight: 800; color: var(--teal); }
+.qopts { display: flex; flex-direction: column; gap: 8px; }
+.qopt .otag { margin-left: auto; font-size: var(--fs-xs); font-weight: 700; }
+/* feedback: icon + words, color only reinforces */
+.qopt.ok { border-color: var(--blue); background: var(--blue-bg); }
+.qopt.ok .ic { color: var(--blue); border-color: var(--blue); }
+.qopt.missed { border: 2px dashed var(--orange); background: var(--orange-bg); }
+.qopt.missed .ic { color: var(--orange); border-color: var(--orange); }
+.qopt.bad { border-color: var(--orange); background: var(--orange-bg); }
+.qopt.bad > span:not(.otag) { text-decoration: line-through; }
+.qopt.bad .ic { color: var(--orange); border-color: var(--orange); }
+.qopt:disabled { cursor: default; opacity: 1; }
+.verdict { margin: 4px 0 0; font-size: var(--fs-sm); color: var(--ink-2); display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; }
+.verdict .ic { width: 16px; height: 16px; align-self: center; }
+/* swipe card */
+.swipe-wrap { position: relative; flex: 1; min-height: 320px; padding-top: 56px; display: grid; place-items: center; }
+.swipe-hint { position: absolute; z-index: 1; top: 0 !important; background: var(--card); border-radius: 12px; padding: 8px 10px; box-shadow: 0 4px 14px -6px rgba(10,12,16,.4); display: flex; flex-direction: row; align-items: center; gap: 4px; font-weight: 800; font-size: var(--fs-sm); opacity: 0; pointer-events: none; }
+.swipe-hint .ic { width: 24px; height: 24px; }
+.swipe-hint.left { left: 0; color: var(--orange); }
+.swipe-hint.right { right: 0; color: var(--blue); }
+.swipecard { width: min(100%, 360px); min-height: 260px; padding: 22px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; border: 2px solid var(--teal); touch-action: pan-y; cursor: grab; -webkit-user-select: none; user-select: none; transition: transform .2s ease; }
+.swipecard.dragging { transition: none; cursor: grabbing; }
+.swipecard .qcell { font-size: var(--fs-xl); font-weight: 800; }
+.swipecard .qand { color: var(--muted); font-size: var(--fs-sm); }
+.swipecard .qmark { font-size: 34px; font-weight: 800; color: var(--teal); }
+.swipecard.right { border-color: var(--blue); background: var(--blue-bg); }
+.swipecard.wrong { border: 2px dashed var(--orange); background: var(--orange-bg); }
+.yn { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.yn .no { border-color: var(--orange); color: var(--orange); }
+.yn .yes { border-color: var(--blue); color: var(--blue); }
+/* Next sits on the page, not on a card: give it a card face so it shows on the blue default page */
+.qmain > .btn.primary { background: var(--card); border-color: var(--card); color: var(--blue); }

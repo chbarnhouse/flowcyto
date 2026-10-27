@@ -99,6 +99,8 @@
     let parts = location.hash.replace(/^#\/?/, '').split('/');
     if (parts[0] === 'pops' || parts[0] === 'clone') { parts = parts.slice(1); history.replaceState(null, '', '#' + parts.join('/')); } // links from before the modes merged
     const [l, s] = parts;
+    if (l === 'markers') { if (S) { pauseTimer(); persist(); } S = null; endTour(); closeRef(true); $('#menu').hidden = true; return FC.markers.open(); }
+    FC.markers.close();
     if (LEVEL_KEYS.includes(l)) {
       const cur = load('flowcyto.current', null);
       if (cur && cur.level === l && String(cur.seed) === s) return startGame(l, +s, cur);
@@ -128,6 +130,8 @@
     }
     const sc = stats.custom;
     h += `<button class="card tile custom" data-custom><b>Custom</b><span class="tnote">Choose every setting, including the scratchpad and the diagnosis.</span><span class="tstat">${sc ? `${sc.solved} solved` : ''}</span></button>`;
+    const mb = load('flowcyto.markersBest', 0);
+    h += `<button class="card tile custom markers" data-markers><b>Markers</b><span class="tnote">Endless quiz: which cells carry which markers.</span><span class="tstat">${mb ? `best streak ${mb}` : ''}</span></button>`;
     h += '</div></main>';
     $('#menu').innerHTML = h;
     syncStatusBar();
@@ -136,6 +140,7 @@
     const p = ev.target.closest('[data-play]'); if (p) return play(p.dataset.play);
     if (ev.target.closest('[data-continue]')) { const c = load('flowcyto.current', null); return play(c.level, c.seed); }
     if (ev.target.closest('[data-custom]')) return openCustom();
+    if (ev.target.closest('[data-markers]')) { location.hash = 'markers'; return; }
     if (ev.target.closest('[data-settings]')) openSettings();
   });
 
