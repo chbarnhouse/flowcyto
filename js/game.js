@@ -45,7 +45,7 @@
   // ---------- storage (every access guarded: private windows may refuse) ----------
   const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || 'null') || d; } catch (e) { return d; } };
   const save = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* stats/prefs just don't persist */ } };
-  const prefs = Object.assign({ enlarge: 'hold', refOpen: 'hold', gscale: 1, plotRows: 2, cellAxis: 'rows', quizRight: 3, quizWrong: 0, autoCheck: false, timer: false, tours: {},
+  const prefs = Object.assign({ enlarge: 'hold', refOpen: 'hold', gscale: 1, plotRows: 2, crossedLast: false, cellAxis: 'rows', quizRight: 3, quizWrong: 0, autoCheck: false, timer: false, tours: {},
     custom: { pops: 4, gating: false, choose: false, decoys: true, extra: true, ref: 'filled', spread: 'normal', pct: false, scratch: true, dx: 'choice' } }, load('flowcyto.prefs', {}));
   prefs.appearance = Object.assign({ mode: 'auto', light: 'default', dark: 'dark' }, prefs.appearance || {});
   prefs.custom = Object.assign({ scratch: true, dx: 'choice' }, prefs.custom);
@@ -339,7 +339,10 @@
   }
   function renderFigures() {
     const cc = $('#clearCrossed'); cc.hidden = !S.crossed.length; cc.innerHTML = `${ICON.close}<span>Clear crossed out (${S.crossed.length})</span>`;
-    $('#plots').innerHTML = S.P.plots.map((pl, i) => `<figure data-plot="${i}" class="${S.flash === i ? 'flash' : ''}${S.crossed.includes(i) ? ' crossed' : ''}">${S.crossed.includes(i) ? `<span class="xmark" title="crossed out">${ICON.strike}</span>` : ''}${renderPlot(S.P, pl, plotOpts(i))}${S.compact ? '' : `<figcaption>${plotName(pl)}</figcaption>`}</figure>`).join('');
+    // Settings → Crossed-out plots: in place, or moved to the end of the strip
+    const order = S.P.plots.map((_, i) => i);
+    if (prefs.crossedLast) order.sort((a, b) => S.crossed.includes(a) - S.crossed.includes(b) || a - b);
+    $('#plots').innerHTML = order.map(i => [S.P.plots[i], i]).map(([pl, i]) => `<figure data-plot="${i}" class="${S.flash === i ? 'flash' : ''}${S.crossed.includes(i) ? ' crossed' : ''}">${S.crossed.includes(i) ? `<span class="xmark" title="crossed out">${ICON.strike}</span>` : ''}${renderPlot(S.P, pl, plotOpts(i))}${S.compact ? '' : `<figcaption>${plotName(pl)}</figcaption>`}</figure>`).join('');
   }
 
   /* Plots in a strip that scrolls sideways, one or two rows (Settings → Plot rows; two fill top to
@@ -1289,6 +1292,7 @@
     if (!quiz) {
       if (!S) h += sec('Puzzles');
       h += `<div class="set-row"><div><b>Plot rows</b><span>Plots sit in a strip that scrolls sideways, in one row or two.</span></div>${seg('plotRows', [[1, 'One'], [2, 'Two']])}</div>`;
+      h += `<div class="set-row"><div><b>Crossed-out plots</b><span>Hold a plot and slide to Cross it out once you've read it.</span></div>${seg('crossedLast', [[false, 'Stay in place'], [true, 'Move to the end']])}</div>`;
       h += `<div class="set-row"><div><b>Cell types</b><span>Where the cell types sit in both the scratchpad and the reference.</span></div>${seg('cellAxis', [['rows', 'Down the side'], ['cols', 'Across the top']])}</div>`;
       h += `<div class="set-row"><div><b>Grid size</b><span>Scratchpad, reference and diagnosis text and cells.</span></div>${seg('gscale', [[0.85, 'Small'], [1, 'Medium'], [1.2, 'Large'], [1.4, 'Larger']])}</div>`;
       h += `<div class="set-row"><div><b>Enlarge a plot</b><span>Press and hold shows it while your finger is down; tap opens it until you tap again. On gated levels a tap always opens it, so you can place its gate.</span></div>${seg('enlarge', [['hold', 'Press and hold'], ['tap', 'Tap']])}</div>`;
@@ -1326,9 +1330,9 @@
     const b = ev.target.closest('[data-pref]');
     if (b) {
       const k = b.dataset.pref, raw = b.dataset.v;
-      const v = (k === 'autoCheck' || k === 'timer') ? raw === 'true' : ['gscale', 'plotRows', 'quizRight', 'quizWrong'].includes(k) ? +raw : raw;
+      const v = (k === 'autoCheck' || k === 'timer' || k === 'crossedLast') ? raw === 'true' : ['gscale', 'plotRows', 'quizRight', 'quizWrong'].includes(k) ? +raw : raw;
       setPref(k, v); applyTheme();
-      if (S) { drawPanel(); tickTimer(); if (refIsOpen()) drawRef(); } else if ($('#quiz').hidden) showMenu();
+      if (S) { if (k === 'crossedLast') drawPlots(); drawPanel(); tickTimer(); if (refIsOpen()) drawRef(); } else if ($('#quiz').hidden) showMenu();
       return openSettings();
     }
     if (ev.target.closest('[data-fill]')) { dlg.close(); fillReference(); }
