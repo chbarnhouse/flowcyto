@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FlowCyto</title>
+<meta name="description" content="FlowCyto: a flow cytometry logic puzzle for STEP 1. Read the dot plots, name the populations, find the clone.">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="game.css">
+</head>
+<body>
+<header class="bar">
+  <div class="bar-in">
+    <span class="brand"><svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><rect x="1" y="1" width="20" height="20" rx="5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11 3v16M3 11h16" stroke="currentColor" stroke-width="1.4" stroke-dasharray="2 2"/><circle cx="7" cy="15" r="2.2" fill="currentColor"/><path d="M15 4.6l2.2 3.6h-4.4z" fill="currentColor"/></svg>FlowCyto</span>
+    <div class="seg" id="modeSeg" role="radiogroup" aria-label="Mode">
+      <button data-mode="pops" role="radio">Name every population</button>
+      <button data-mode="clone" role="radio">Diagnose the clone</button>
+    </div>
+    <div class="seg" id="levelSeg" role="radiogroup" aria-label="Difficulty">
+      <button data-level="easy" role="radio">Easy</button>
+      <button data-level="medium" role="radio">Medium</button>
+      <button data-level="hard" role="radio">Hard</button>
+    </div>
+    <button class="btn primary" id="newBtn">New board</button>
+  </div>
+</header>
+<main class="board">
+  <section class="plots-col">
+    <div class="board-head"><h1 id="specName"></h1><span class="pill" id="boardId"></span></div>
+    <div class="plots" id="plots"></div>
+  </section>
+  <aside class="panel card" id="panel"></aside>
+</main>
+<script src="js/kb.js"></script>
+<script src="js/gen.js"></script>
+<script src="js/plot.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>

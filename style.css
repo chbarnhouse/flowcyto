@@ -1,0 +1,62 @@
+/* FlowCyto — palette shared with Step 1 Pathways (ClaudeOS design/tokens.css).
+   CVD-safe roles: blue · orange · pink · teal · gold · slate. No purple, no green.
+   Never color alone: every population also has a shape and a letter; marks are icons with text. */
+:root {
+  --paper: #f6f7f9; --sunk: #eef0f4; --card: #ffffff;
+  --line: #dde2ea; --line-soft: #e9edf2;
+  --ink: #14181f; --ink-2: #3d4654; --muted: #5d6877;
+  --blue: #1d5fa8; --blue-bg: #e7eff9;
+  --orange: #c25e00; --orange-bg: #fcefe1;
+  --pink: #a8437a; --pink-bg: #f8e8f0;
+  --teal: #0b7a80; --teal-bg: #def2f3;
+  --gold: #8a6500; --gold-bg: #f8efd6;
+  --slate: #66717f; --slate-bg: #e9ecf0;
+  --display: Archivo, "Helvetica Neue", Arial, sans-serif;
+  --fs-xs: 11px; --fs-sm: 13px; --fs-md: 15px; --fs-lg: 17px; --fs-xl: 20px; --fs-2xl: 26px;
+  --radius: 14px; --ctrl: 10px;
+  --shadow: 0 1px 2px rgba(20,24,31,.05), 0 10px 30px -18px rgba(20,24,31,.22);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f1217; --sunk: #161a21; --card: #181d25;
+    --line: #2b323d; --line-soft: #222933;
+    --ink: #e9edf3; --ink-2: #b9c2cf; --muted: #8e98a8;
+    --blue: #7fb2ea; --blue-bg: #17283d;
+    --orange: #f0a05a; --orange-bg: #33220f;
+    --pink: #e58cb4; --pink-bg: #351f2b;
+    --teal: #5cc6cc; --teal-bg: #0f2c2e;
+    --gold: #e3bd55; --gold-bg: #2f2710;
+    --slate: #98a3b3; --slate-bg: #1d222a;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.7);
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 400 var(--fs-md)/1.45 var(--display); }
+button { font: inherit; color: inherit; }
+h1, h2, h3 { margin: 0; line-height: 1.2; }
+
+/* ---- dot plots ---- */
+.dotplot { display: block; max-width: 100%; height: auto; }
+.dp-frame { fill: var(--card); stroke: var(--line); }
+.dp-tick { stroke: var(--muted); }
+.dp-cut { stroke: var(--slate); stroke-dasharray: 4 3; stroke-width: 1.2; }
+.dp-ev { opacity: .62; stroke: var(--card); stroke-width: .35; }
+.dp-dim { opacity: .14; }
+.dp-ax { font: 600 12px var(--display); fill: var(--ink-2); }
+.dp-q { font: 700 12px var(--display); fill: var(--muted); }
+.dp-badge circle { fill: var(--card); stroke-width: 2.4; }
+.dp-badge text { font: 800 12px var(--display); fill: var(--ink); }
+.dp-badge.dp-dim { opacity: .3; }
+.shape-ic { flex: none; vertical-align: -3px; }
+
+/* ---- shared bits ---- */
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+.btn { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 6px 14px; border: 1.5px solid var(--line); border-radius: var(--ctrl); background: var(--card); font-weight: 600; font-size: var(--fs-sm); cursor: pointer; }
+.btn:hover { border-color: var(--slate); }
+.btn.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+.btn:disabled { opacity: .45; cursor: default; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; background: var(--sunk); font-size: var(--fs-xs); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-2); }
+.muted { color: var(--muted); }
+.ic { width: 16px; height: 16px; flex: none; }
