@@ -69,9 +69,9 @@
 
   // ---------- difficulty ----------
   const LEVELS = {
-    easy: { label: 'Easy', pops: 3, decoys: 2, dx: 3, clone: 0.7, extra: 2, herring: 0, pct: false, wantMatching: false },
-    medium: { label: 'Medium', pops: 4, decoys: 3, dx: 4, cloneMin: 2, clone: 1, extra: 0, herring: 0, pct: false, wantMatching: true },
-    hard: { label: 'Hard', pops: 5, decoys: 4, dx: 5, cloneMin: 2, clone: 1, extra: 0, herring: 1, pct: true, wantMatching: true },
+    easy: { label: 'Easy', spread: 1, pops: 3, decoys: 2, dx: 3, clone: 0.7, extra: 2, herring: 0, pct: false, wantMatching: false },
+    medium: { label: 'Medium', spread: 1.18, pops: 4, decoys: 3, dx: 4, cloneMin: 2, clone: 1, extra: 0, herring: 0, pct: false, wantMatching: true },
+    hard: { label: 'Hard', spread: 1.32, pops: 5, decoys: 4, dx: 5, cloneMin: 2, clone: 1, extra: 0, herring: 1, pct: true, wantMatching: true },
   };
 
   const ALL_MARKERS = markersOf(PLOTS);
@@ -189,7 +189,11 @@
   const TOTAL = 900;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
+  /* Harder levels draw looser clusters (spread scales every SD). Kept so that negative and positive
+     still sit on their own side of the cut: the uniqueness proof assumes each cluster reads clearly. */
   function simulate(puzzle, r) {
+    const k = LEVELS[puzzle.level].spread || 1;
+    const lv = (c, r) => { const [m, s] = LOG[c]; return clamp(m + s * k * gauss(r), 0.03, 3.97); };
     const mks = ['FSC', 'SSC', 'CD45', ...new Set(puzzle.plots.flatMap(p => plotMarkers([p.x, p.y])))];
     return puzzle.pops.map(pop => {
       const e = BY[pop.id];
@@ -198,8 +202,8 @@
       for (let i = 0; i < n; i++) {
         const u = r(), o = {};
         for (const mk of mks) {
-          if (mk === 'FSC') { const [m, s] = FSCV[e.fsc]; o.FSC = clamp(m + s * gauss(r), 5, 1018); continue; }
-          if (mk === 'SSC') { const [m, s] = SSCV[e.ssc]; o.SSC = clamp(m + s * gauss(r), 5, 1018); continue; }
+          if (mk === 'FSC') { const [m, s] = FSCV[e.fsc]; o.FSC = clamp(m + s * k * gauss(r), 5, 1018); continue; }
+          if (mk === 'SSC') { const [m, s] = SSCV[e.ssc]; o.SSC = clamp(m + s * k * gauss(r), 5, 1018); continue; }
           if (mk === 'LC') {
             const k = pop.lc === 'kappa' || (pop.lc === 'poly' && r() < 0.6);
             const l = pop.lc === 'lambda' || (pop.lc === 'poly' && !k);
@@ -218,7 +222,6 @@
       return ev;
     });
   }
-  function lv(k, r) { const [m, s] = LOG[k]; return clamp(m + s * gauss(r), 0.03, 3.97); }
 
   /* Why a decoy doesn't fit a population, in words — for the end-of-board explanation. */
   function why(eid, pop, plots) {

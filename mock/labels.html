@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FlowCyto labeling options</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../style.css">
+<style>
+  body { padding: 20px; }
+  .opt { max-width: 1240px; margin: 0 auto 22px; padding: 16px 20px 20px; }
+  .opt h2 { font-size: var(--fs-xl); display: flex; gap: 10px; align-items: center; }
+  .opt p.how { margin: 4px 0 12px; color: var(--ink-2); font-size: var(--fs-sm); max-width: 900px; }
+  .tag { font-size: var(--fs-xs); font-weight: 800; border: 1.5px solid var(--ink); border-radius: 6px; padding: 1px 7px; }
+  .plots { display: flex; gap: 8px; flex-wrap: wrap; }
+  figure { margin: 0; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 4px; }
+  figcaption { font-size: 11px; color: var(--muted); text-align: center; font-weight: 700; }
+  .tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 0 0 10px; font-size: var(--fs-sm); font-weight: 600; }
+  .paint { display: inline-flex; gap: 6px; align-items: center; border: 1.5px solid var(--line); border-radius: 999px; padding: 4px 10px; font-size: var(--fs-sm); font-weight: 700; background: var(--card); }
+  .paint.sel { border: 3px solid var(--ink); }
+  .rows { margin-top: 12px; font-size: var(--fs-sm); display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; max-width: 760px; }
+  .rows b { display: inline-flex; gap: 6px; align-items: center; }
+  .gate { stroke: var(--ink); stroke-width: 2; fill: none; stroke-dasharray: 5 3; }
+</style>
+</head>
+<body>
+<div id="out"></div>
+<script src="../js/kb.js"></script>
+<script src="../js/gen.js"></script>
+<script src="../js/plot.js"></script>
+<script>
+const { generate, renderPlot, shapeIcon, quadrant } = FC;
+const P = generate(6, 'hard', 'pops');
+const fig = (pl, o) => `<figure>${renderPlot(P, pl, { size: 200, ...o })}<figcaption>${pl.x === 'LC' ? 'kappa / lambda' : pl.x + ' / ' + pl.y}</figcaption></figure>`;
+const plots = P.plots.slice(0, 5);
+// Hard mock: the player has painted two quadrant gates on CD19/CD5.
+const cd = P.plots.find(p => p.key === 'CD19/CD5');
+const paint = P.events.map(evs => evs.map(e => { const q = quadrant(e, cd); return q === 'x+y+' ? 0 : q === 'x+y-' ? 1 : -1; }));
+const paintChip = (slot, name, sel) => `<span class="paint ${sel ? 'sel' : ''}">${shapeIcon(slot)} ${name}</span>`;
+document.getElementById('out').innerHTML = `
+<section class="card opt"><h2><span class="tag">1</span> Labeled: today's boards (keep for Easy)</h2>
+<p class="how">Every population has a shape, a color and a letter badge on each cluster. You read which letter sits where, then name it.</p>
+<div class="plots">${plots.map(p => fig(p, {})).join('')}</div></section>
+
+<section class="card opt"><h2><span class="tag">2</span> Shapes, no letters (Medium)</h2>
+<p class="how">The shapes and colors still tie a population together across plots, but there are no badges. You match each grid row's shape to its clusters yourself, and the overlapping negative corner takes a closer look. Cheap to build.</p>
+<div class="plots">${plots.map(p => fig(p, { labels: 'shapes' })).join('')}</div></section>
+
+<section class="card opt"><h2><span class="tag">3</span> Unlabeled, you paint the gates (Hard)</h2>
+<p class="how">Every event is a plain gray dot, like real cytometer output. Pick a paint, then tap a quadrant on any plot: those events take that paint's shape and color in <i>every</i> plot (backgating). Here the player painted CD19+CD5+ as paint 1 and CD19+CD5− as paint 2, then saw that paint 1 holds one light chain and paint 2 holds both. To keep it fair, the board checks your paints: each must catch one population cleanly before you can name it. This is real gating, so it is the biggest build of the three.</p>
+<div class="tools">Paint: ${paintChip(0, '1', false)}${paintChip(1, '2', true)}${paintChip(2, '3', false)}${paintChip(3, '4', false)}${paintChip(4, '5', false)}<span class="muted">tap a quadrant · tap again to clear</span></div>
+<div class="plots">${plots.map(p => fig(p, { labels: 'none', paint })).join('')}</div>
+<div class="rows"><b>Name every population</b><span>Rows are your paints instead of letters: "${shapeIcon(0)} 1 is …", "${shapeIcon(1)} 2 is …". A paint that catches two populations is flagged as mixed and can't be named until you narrow it with a second gate.</span>
+<b>Diagnose the clone</b><span>Nothing is highlighted: you find the abnormal population yourself, paint it, then diagnose it. The share-of-events question is then read straight from your gate.</span></div>
+</section>`;
+</script>
+</body>
+</html>

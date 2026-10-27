@@ -27,7 +27,10 @@
   const isScatter = mk => mk === 'FSC' || mk === 'SSC';
   const label = mk => mk === 'LCk' ? 'kappa' : mk === 'LCl' ? 'lambda' : mk;
 
-  /* opts: { size, focus (slot to emphasize), hideBadges, title } */
+  /* opts: { size, focus (slot to emphasize), labels, paint }
+     labels: 'full' (shape + color + a letter badge on every cluster) · 'shapes' (no badges) ·
+     'none' (every event a plain gray dot, except events the player painted: paint[k][i] is the
+     paint slot for event i of population k, or -1; a paint draws with that slot's shape and color). */
   function renderPlot(puzzle, plot, opts = {}) {
     const S = opts.size || 240, L = 36, B = 30, T = 8, R = 8, W = S - L - R, H = S - T - B;
     const xm = plot.x === 'LC' ? 'LCk' : plot.x, ym = plot.x === 'LC' ? 'LCl' : plot.y;
@@ -45,18 +48,30 @@
     // events, drawn in interleaved order so no population sits wholly on top
     const pops = puzzle.pops, ev = puzzle.events;
     const max = Math.max(...ev.map(e => e.length));
-    const paths = pops.map(() => []);
-    for (let i = 0; i < max; i++) pops.forEach((p, k) => { const e = ev[k][i]; if (e) paths[k].push(glyph(SHAPES[p.slot], sx(axisVal(e, xm)), sy(axisVal(e, ym)), 2.3)); });
-    pops.forEach((p, k) => {
-      const dim = opts.focus != null && opts.focus !== p.slot;
-      out.push(`<path d="${paths[k].join('')}" fill="${COLORS[p.slot]}" class="dp-ev${dim ? ' dp-dim' : ''}"/>`);
-    });
+    const labels = opts.labels || 'full';
+    if (labels === 'none') {
+      const gray = [], painted = SHAPES.map(() => []);
+      for (let i = 0; i < max; i++) pops.forEach((p, k) => {
+        const e = ev[k][i]; if (!e) return;
+        const slot = opts.paint && opts.paint[k] ? opts.paint[k][i] : -1, x = sx(axisVal(e, xm)), y = sy(axisVal(e, ym));
+        if (slot >= 0) painted[slot].push(glyph(SHAPES[slot], x, y, 2.3)); else gray.push(glyph('circle', x, y, 1.7));
+      });
+      out.push(`<path d="${gray.join('')}" class="dp-ev dp-gray"/>`);
+      painted.forEach((d, slot) => { if (d.length) out.push(`<path d="${d.join('')}" fill="${COLORS[slot]}" class="dp-ev"/>`); });
+    } else {
+      const paths = pops.map(() => []);
+      for (let i = 0; i < max; i++) pops.forEach((p, k) => { const e = ev[k][i]; if (e) paths[k].push(glyph(SHAPES[p.slot], sx(axisVal(e, xm)), sy(axisVal(e, ym)), 2.3)); });
+      pops.forEach((p, k) => {
+        const dim = opts.focus != null && opts.focus !== p.slot;
+        out.push(`<path d="${paths[k].join('')}" fill="${COLORS[p.slot]}" class="dp-ev${dim ? ' dp-dim' : ''}"/>`);
+      });
+    }
     // axes
     out.push(`<text x="${L + W / 2}" y="${S - 6}" class="dp-ax" text-anchor="middle">${label(xm)}</text>`);
     out.push(`<text x="12" y="${T + H / 2}" class="dp-ax" text-anchor="middle" transform="rotate(-90 12 ${T + H / 2})">${label(ym)}</text>`);
     if (!isScatter(xm)) out.push(`<text x="${(L + sx(CUT)) / 2}" y="${T + H + 12}" class="dp-q" text-anchor="middle">−</text><text x="${(sx(CUT) + L + W) / 2}" y="${T + H + 12}" class="dp-q" text-anchor="middle">+</text>`);
     if (!isScatter(ym)) out.push(`<text x="${L - 9}" y="${(T + sy(CUT)) / 2 + 4}" class="dp-q" text-anchor="middle">+</text><text x="${L - 9}" y="${(sy(CUT) + T + H) / 2 + 4}" class="dp-q" text-anchor="middle">−</text>`);
-    if (!opts.hideBadges) out.push(badges(pops, ev, xm, ym, sx, sy, L, T, W, H, opts.focus));
+    if (labels === 'full') out.push(badges(pops, ev, xm, ym, sx, sy, L, T, W, H, opts.focus));
     out.push('</svg>');
     return out.join('');
   }
@@ -87,5 +102,11 @@
     return marks.map(m => `<g class="dp-badge${focus != null && focus !== m.p.slot ? ' dp-dim' : ''}" transform="translate(${m.x.toFixed(1)},${m.y.toFixed(1)})"><circle r="9.5" stroke="${COLORS[m.p.slot]}"/><text y="4" text-anchor="middle">${m.p.label}</text></g>`).join('');
   }
 
-  window.FC = Object.assign(window.FC || {}, { renderPlot, shapeIcon, SHAPES, COLORS });
+  /* Which quadrant an event sits in on a plot: 'x+y+' etc. (scatter axes count as '+' throughout). */
+  function quadrant(ev, plot) {
+    const xm = plot.x === 'LC' ? 'LCk' : plot.x, ym = plot.x === 'LC' ? 'LCl' : plot.y;
+    const sx = isScatter(xm) ? '' : axisVal(ev, xm) > CUT ? 'x+' : 'x-', sy = isScatter(ym) ? '' : axisVal(ev, ym) > CUT ? 'y+' : 'y-';
+    return sx + sy;
+  }
+  window.FC = Object.assign(window.FC || {}, { renderPlot, shapeIcon, quadrant, SHAPES, COLORS, CUT });
 })();
