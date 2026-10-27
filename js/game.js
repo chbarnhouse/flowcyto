@@ -129,9 +129,9 @@
       h += `<button class="card tile" data-play="${l}"><b>${L.label}</b><span class="tnote">${LEVEL_NOTES[l]}</span><span class="tstat">${sv ? `${sv.solved} solved${prefs.timer && sv.best ? ` · best ${fmtTime(sv.best)}` : ''}` : ''}</span></button>`;
     }
     const sc = stats.custom;
-    h += `<button class="card tile custom" data-custom><b>Custom</b><span class="tnote">Choose every setting, including the scratchpad and the diagnosis.</span><span class="tstat">${sc ? `${sc.solved} solved` : ''}</span></button>`;
+    h += `<button class="card tile custom" data-custom><b>Custom</b><span class="tnote">Set every switch yourself: plots, gates, scratchpad, diagnosis.</span><span class="tstat">${sc ? `${sc.solved} solved` : ''}</span></button>`;
     const mb = load('flowcyto.markersBest', 0);
-    h += `<button class="card tile custom markers" data-markers><b>Markers</b><span class="tnote">Endless quiz: which cells carry which markers.</span><span class="tstat">${mb ? `best streak ${mb}` : ''}</span></button>`;
+    h += `<button class="card tile custom markers" data-markers><b>Markers</b><span class="tnote">Endless quiz: which cells carry which markers. Swipe or pick.</span><span class="tstat">${mb ? `best streak ${mb}` : ''}</span></button>`;
     h += '</div></main>';
     $('#menu').innerHTML = h;
     syncStatusBar();
@@ -321,23 +321,43 @@
     fitPlots();
   }
 
-  /* Every plot on screen at once: pick the column count that gives the biggest square plots in the
-     space left above (phones) or beside (desktop) the answer. Press-and-hold or tap shows one large. */
+  /* Plots in a fixed arrangement: 1–3 in one row, 4 as 2×2, 5 as 3+2, 6 as 3×3, 7+ three to a row
+     scrolling with 2¼ rows showing. A short last row is centered (the grid has two tracks per plot, so
+     a pair can sit half a plot in). On phones the plots take only the height they need, up to 56% of
+     the board, and the answer panel below gets the rest. */
+  const stacked = () => matchMedia('(max-width: 900px)').matches;
   function fitPlots() {
     const grid = $('#plots'); if (!S || !grid.clientWidth) return;
-    const n = S.P.plots.length, W = grid.clientWidth, H = grid.clientHeight, gap = 8, pad = 10, cap = 16;
-    let best = { s: 0, c: 1 };
-    for (let c = 1; c <= n; c++) {
-      const r = Math.ceil(n / c);
-      const s = Math.min((W - gap * (c - 1)) / c - pad, (H - gap * (r - 1)) / r - pad - cap);
-      if (s > best.s) best = { s, c };
-    }
-    const s = Math.max(64, Math.min(330, Math.floor(best.s)));
+    const n = S.P.plots.length, cs = getComputedStyle(grid), gap = parseFloat(cs.columnGap) || 8, pad = 10, cap = 16;
+    const cols = n <= 3 ? n : n === 4 ? 2 : 3, rows = Math.ceil(n / cols), vis = n > 6 ? 2.25 : rows;
+    const col = $('.plots-col'), phone = stacked();
+    let H;
+    if (phone) {
+      const board = $('.board'), bs = getComputedStyle(board);
+      const inner = board.clientHeight - parseFloat(bs.paddingTop) - parseFloat(bs.paddingBottom) - parseFloat(bs.rowGap || 0);
+      const head = $('.board-head'), hh = head.offsetHeight ? head.offsetHeight + parseFloat(getComputedStyle(head).marginBottom) : 0;
+      H = inner * 0.56 - hh;
+    } else { grid.style.height = ''; H = grid.clientHeight; }
+    const sW = (grid.clientWidth - gap * (cols - 1)) / cols - pad;
+    const sH = (H + gap) / vis - gap - pad - cap;
+    const s = Math.max(64, Math.min(330, Math.floor(Math.min(sW, sH))));
     const compact = s < 170;
     if (compact !== !!S.compact) { S.compact = compact; return drawPlots(); }
     grid.style.setProperty('--plot', s + 'px');
-    grid.style.gridTemplateColumns = `repeat(${best.c}, ${s + pad}px)`;
+    grid.style.gridTemplateColumns = `repeat(${cols * 2}, ${(s + pad - gap) / 2}px)`;
+    const last = n - (rows - 1) * cols;
+    [...grid.children].forEach((f, i) => {
+      const r = Math.floor(i / cols), k = i % cols, off = r === rows - 1 ? cols - last : 0;
+      f.style.gridColumn = `${off + 2 * k + 1} / span 2`;
+    });
     grid.classList.toggle('tiny', s < 150);
+    grid.classList.toggle('scroll', n > 6);
+    if (phone) {
+      // the figure's real height (border, padding, caption) rather than the estimate
+      const fh = grid.firstElementChild ? grid.firstElementChild.offsetHeight : s + pad + cap;
+      grid.style.height = Math.ceil(vis * (fh + gap) - gap) + 'px';
+    }
+    col.classList.toggle('fit', phone);
   }
 
   // ---------- scratchpad columns (S.cols) and reference rows (S.refs) ----------
@@ -435,6 +455,13 @@
     refPane.innerHTML = `<div class="refpane-in card">${refHTML()}</div>`;
     refPane.classList.toggle('held', refHeld);
     fitGrid(refPane.querySelector('.pad'), refPane.querySelector('.gridwrap'));
+    // a held sheet can't be scrolled (the finger is on the button): grow it upward until it all fits,
+    // never past the top bar
+    const inn = refPane.querySelector('.refpane-in'), over = inn.scrollHeight - inn.clientHeight;
+    if (refHeld && over > 0) {
+      const top = Math.max($('.bar').getBoundingClientRect().bottom, parseFloat(refPane.style.top) - over);
+      Object.assign(refPane.style, { top: top + 'px', height: (innerHeight - top) + 'px' });
+    }
   }
   function openRef(row) {
     if (!S) return;
@@ -550,7 +577,8 @@
       if (play) h += `<p class="help">A full name or a common abbreviation (CLL, APL, M3…); case, spaces and punctuation don't matter. <span class="tally">${tallyText()}</span></p>`;
     } else {
       const opts = P.dxPool.slice();
-      const btn = id => { const m = S.marks['dx|' + id], c = S.checked[id]; return `<button class="dx ${m || ''}" data-dx="${id}" ${play ? '' : 'disabled'}>${m ? ICON[m] : '<span class="ic"></span>'}<span class="nm">${esc(BY[id].name)}</span>${c ? `<span class="rowmark ${c}">${ICON[c]}<span>${c}</span></span>` : ''}</button>`; };
+      // tap a name to diagnose; the small button beside it only crosses it out (and back)
+      const btn = id => { const m = S.marks['dx|' + id], c = S.checked[id]; return `<div class="dxrow ${m || ''}"><button class="dx ${m || ''}" data-dx="${id}" ${play ? '' : 'disabled'}>${m === 'yes' ? ICON.yes : ''}<span class="nm">${esc(BY[id].name)}</span>${c ? `<span class="rowmark ${c}">${ICON[c]}<span>${c}</span></span>` : ''}</button>${play ? `<button class="xout" data-xout="${id}" aria-pressed="${m === 'no'}" aria-label="${m === 'no' ? 'Restore' : 'Cross out'} ${esc(BY[id].name)}" title="${m === 'no' ? 'Restore' : 'Cross out'}">${ICON.no}</button>` : ''}</div>`; };
       if (mode === 'choice') h += `<div class="dxlist four">${opts.map(btn).join('')}</div>`;
       else {
         for (const [lin, title] of Object.entries(LINEAGE)) {
@@ -558,8 +586,7 @@
           if (g.length) h += `<div class="dxgroup"><h3>${title}</h3><div class="dxlist all">${g.map(btn).join('')}</div></div>`;
         }
       }
-      const ready = opts.some(id => S.marks['dx|' + id] === 'yes');
-      if (play) h += `<div class="actions">${prefs.autoCheck ? '' : `<button class="btn primary" data-act="dx" ${ready ? '' : 'disabled'}>Diagnose</button>`}<span class="tally">${tallyText()}</span></div>`;
+      if (play) h += `<div class="actions"><span class="help">Tap a diagnosis to choose it.</span><span class="tally">${tallyText()}</span></div>`;
     }
     return h;
   }
@@ -843,7 +870,7 @@
       if (S.marks[k] === 'yes' && (r2 === prefix || (prefix !== 'dx' && r2 !== 'dx' && i2 === sol))) delete S.marks[k];
     }
     S.marks[key(sol)] = 'yes';
-    if (prefs.autoCheck) { if (prefix === 'dx') checkDx(sol); else autoCheckRow(r.label); }
+    if (prefix === 'dx') checkDx(sol); else if (prefs.autoCheck) autoCheckRow(r.label);
     say(text + ' Chose it.', prefix === 'dx' ? null : r);
   }
 
@@ -959,16 +986,16 @@
       if (next === 'yes' && prefs.autoCheck) autoCheckRow(row);
       return drawPanel();
     }
-    const dx = ev.target.closest('[data-dx]');
-    if (dx) {
+    const xo = ev.target.closest('[data-xout]');
+    if (xo) {
       pushUndo();
-      const key = 'dx|' + dx.dataset.dx, next = cycle(S.marks[key]);
-      if (next === 'yes') for (const k of Object.keys(S.marks)) if (k.startsWith('dx|') && S.marks[k] === 'yes') delete S.marks[k];
-      if (next) S.marks[key] = next; else delete S.marks[key];
-      delete S.checked[dx.dataset.dx]; S.msg = null;
-      if (next === 'yes' && prefs.autoCheck) { checkDx(dx.dataset.dx); drawPlots(); }
+      const key = 'dx|' + xo.dataset.xout;
+      if (S.marks[key] === 'no') delete S.marks[key]; else S.marks[key] = 'no';
+      S.msg = null;
       return drawPanel();
     }
+    const dx = ev.target.closest('[data-dx]');
+    if (dx) { pushUndo(); S.msg = null; checkDx(dx.dataset.dx); drawPanel(); return drawPlots(); }
     const act = ev.target.closest('[data-act]');
     if (act && act.dataset.act === 'check') return check();
     if (act && act.dataset.act === 'dx') { checkDx(S.P.dxPool.find(id => S.marks['dx|' + id] === 'yes')); drawPanel(); return drawPlots(); }
@@ -1172,7 +1199,7 @@
       ['#hintBtn', 'Hint fixes or places gates first, adds a cell type the answer needs, then helps you name.'],
     ],
     dx: [
-      ['#panel', 'Now the diagnosis: the abnormal population is highlighted in every plot. Rule out neoplasms that don\'t fit (tap once), then choose one (tap twice) and press Diagnose.'],
+      ['#panel', 'Now the diagnosis: the abnormal population is highlighted in every plot. Tap a neoplasm to diagnose it. The × beside each one crosses it out while you think, and tapping it again brings it back.'],
       ['#hintBtn', 'Hint rules one out and says which plot did it.'],
     ],
     'dx-type': [

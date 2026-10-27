@@ -75,7 +75,7 @@
   }
 
   // ---------- state ----------
-  const Q = { cfg: Object.assign({ kinds: { match: true, cells: true, markers: true }, cells: 'both' }, load('flowcyto.markers', {})), q: null, picked: new Set(), done: false, right: null, score: 0, answered: 0, streak: 0 };
+  const Q = { cfg: Object.assign({ kinds: { match: true, cells: true, markers: true }, cells: 'both' }, load('flowcyto.markers', {})), q: null, picked: new Set(), crossed: new Set(), done: false, right: null, score: 0, answered: 0, streak: 0 };
   const best = () => load('flowcyto.markersBest', 0);
 
   // ---------- views ----------
@@ -98,7 +98,7 @@
       <button class="btn primary big" data-qstart ${any ? '' : 'disabled'}>Start</button>${any ? '' : '<p class="help">Pick at least one kind of question.</p>'}</section></main>`;
   }
   function next() {
-    Q.q = makeQuestion(); Q.picked = new Set(); Q.done = false; Q.right = null;
+    Q.q = makeQuestion(); Q.picked = new Set(); Q.crossed = new Set(); Q.done = false; Q.right = null;
     if (!Q.q) { $('#quiz').innerHTML = bar() + '<main class="qmain"><section class="qcard card"><p>No questions fit these settings. Try more cell types.</p></section></main>'; return; }
     draw();
   }
@@ -116,9 +116,11 @@
     let h = `<section class="qcard card"><span class="qkind">${isCells ? 'Which cells carry it?' : 'Which markers does it carry?'} Pick all that apply.</span><b class="qbig">${esc(isCells ? mk.name : BY[q.id].name)}</b>${isCells && mk.note ? `<p class="help">${esc(mk.note)}</p>` : ''}<div class="qopts">`;
     for (const o of q.options) {
       const on = Q.picked.has(o), isRight = q.correct.includes(o);
-      let cls = on ? 'on' : '', mark = on ? ICON.yes : '<span class="ic"></span>', tail = '';
+      const x = !fb && Q.crossed.has(o);
+      let cls = on ? 'on' : x ? 'crossed' : '', mark = on ? ICON.yes : '<span class="ic"></span>', tail = '';
       if (fb) { cls = isRight ? (on ? 'ok' : 'missed') : (on ? 'bad' : ''); mark = isRight ? ICON.yes : (on ? ICON.no : '<span class="ic"></span>'); tail = `<span class="otag">${isRight ? (on ? 'carries it' : 'carries it: missed') : (on ? "doesn't" : '')}</span>`; }
-      h += `<button class="qopt ${cls}" data-qopt="${o}" ${fb ? 'disabled' : ''}>${mark}<span>${esc(isCells ? BY[o].name : MARKERS[o].name)}</span>${tail}</button>`;
+      const nm = esc(isCells ? BY[o].name : MARKERS[o].name);
+      h += `<div class="qrow-opt"><button class="qopt ${cls}" data-qopt="${o}" ${fb ? 'disabled' : ''}>${mark}<span>${nm}</span>${tail}</button>${fb ? '' : `<button class="xout" data-qx="${o}" aria-pressed="${x}" aria-label="${x ? 'Restore' : 'Cross out'} ${nm}" title="${x ? 'Restore' : 'Cross out'}">${ICON.no}</button>`}</div>`;
     }
     h += '</div>';
     if (fb) h += `<p class="verdict">${Q.right ? ICON.yes + ' All right.' : ICON.no + ' Not quite.'} ${isCells ? '' : esc(BY[q.id].teach)}</p>`;
@@ -168,7 +170,8 @@
     if (ev.target.closest('[data-qstart]')) return next();
     if (ev.target.closest('[data-qnext]')) return next();
     const yn = ev.target.closest('[data-yn]'); if (yn && !Q.done) return answer((yn.dataset.yn === 'yes') === Q.q.answer);
-    const o = ev.target.closest('[data-qopt]'); if (o && !Q.done) { const v = o.dataset.qopt; Q.picked.has(v) ? Q.picked.delete(v) : Q.picked.add(v); return draw(); }
+    const x = ev.target.closest('[data-qx]'); if (x && !Q.done) { const v = x.dataset.qx; Q.crossed.has(v) ? Q.crossed.delete(v) : (Q.crossed.add(v), Q.picked.delete(v)); return draw(); }
+    const o = ev.target.closest('[data-qopt]'); if (o && !Q.done) { const v = o.dataset.qopt; Q.picked.has(v) ? Q.picked.delete(v) : (Q.picked.add(v), Q.crossed.delete(v)); return draw(); }
     if (ev.target.closest('[data-qcheck]')) { const q = Q.q, ok = q.correct.length === Q.picked.size && q.correct.every(x => Q.picked.has(x)); return answer(ok); }
   });
   document.addEventListener('keydown', ev => {

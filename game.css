@@ -5,6 +5,7 @@
 
 /* ---------- main menu ---------- */
 .menu-in { max-width: 760px; margin: 0 auto; padding: max(28px, env(safe-area-inset-top)) 16px 40px; display: flex; flex-direction: column; gap: 16px; }
+.logo p { text-wrap: balance; }
 .logo { display: flex; gap: 14px; align-items: center; color: var(--blue); margin-bottom: 6px; }
 .logo h1 { font-size: 34px; font-weight: 800; letter-spacing: -.01em; }
 .logo p { margin: 2px 0 0; color: var(--muted); font-weight: 600; }
@@ -48,6 +49,9 @@ html.in-game, html.in-game body { background: var(--card); }
 .board-head { flex: none; display: flex; gap: 10px; align-items: baseline; margin-bottom: 8px; min-width: 0; }
 .board-head h1 { font-size: var(--fs-lg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .plots { flex: 1; min-height: 0; display: grid; gap: 8px; align-content: start; justify-content: center; }
+.plots.scroll { overflow-y: auto; overscroll-behavior: contain; }
+.plots-col.fit { flex: none; }
+.plots-col.fit .plots { flex: none; }
 .plots figure { margin: 0; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 4px; cursor: zoom-in;
   -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
 .plots .dotplot { width: var(--plot, 240px); height: var(--plot, 240px); }
@@ -83,6 +87,13 @@ html.in-game, html.in-game body { background: var(--card); }
 .dx.no { color: var(--muted); background: var(--sunk); }
 .dx.no .nm { text-decoration: line-through; }
 .dx.yes { border: 3px solid var(--blue); background: var(--blue-bg); }
+/* diagnosis and quiz options: the name chooses, the small × beside it only crosses it out */
+.dxrow, .qrow-opt { display: flex; gap: 4px; align-items: stretch; min-width: 0; }
+.dxrow .dx { min-width: 0; }
+.xout { flex: none; width: 40px; display: grid; place-items: center; border: 1.5px solid var(--line); border-radius: 9px; background: var(--card); color: var(--muted); cursor: pointer; padding: 0; }
+.xout .ic { width: 14px; height: 14px; }
+.xout[aria-pressed="true"] { background: var(--sunk); color: var(--ink); border-color: var(--slate, var(--muted)); border-style: dashed; }
+.xout:hover { border-color: var(--slate, var(--muted)); color: var(--ink); }
 .padlink { border: 1.5px solid var(--line); background: var(--card); border-radius: 9px; padding: 0 10px; font-size: var(--fs-xs); font-weight: 700; color: var(--blue); cursor: pointer; }
 
 .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 10px 0; }
@@ -186,10 +197,10 @@ html.in-game, html.in-game body { background: var(--card); }
 
 /* ---------- reference / scratch pad overlay ---------- */
 .refpane { position: fixed; z-index: 15; display: flex; flex-direction: column; background: rgba(10,12,16,.35); padding-top: 22px; }
-.refpane-in { position: relative; flex: 1; min-height: 0; width: 100%; overflow: auto; padding: 10px 16px calc(16px + env(safe-area-inset-bottom, 0px)); border: 0; border-top: 3px solid var(--blue); border-radius: 16px 16px 0 0; box-shadow: 0 -10px 28px -8px rgba(10,12,16,.45); }
+.refpane-in { position: relative; flex: 1; min-height: 0; width: 100%; overflow: auto; padding: 10px max(18px, calc(env(safe-area-inset-right, 0px) + 10px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(18px, calc(env(safe-area-inset-left, 0px) + 10px)); border: 0; border-top: 3px solid var(--blue); border-radius: 16px 16px 0 0; box-shadow: 0 -10px 28px -8px rgba(10,12,16,.45); }
 .ref-title { display: flex; align-items: center; gap: 6px; margin: 0 44px 4px 0; font-weight: 800; font-size: var(--fs-sm); color: var(--blue); text-transform: uppercase; letter-spacing: .06em; }
 .ref-title .ic { width: 16px; height: 16px; }
-.refclose { position: absolute; top: 6px; right: 8px; width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid var(--line); background: var(--card); color: var(--ink-2); display: grid; place-items: center; cursor: pointer; z-index: 2; }
+.refclose { position: absolute; top: 8px; right: max(14px, calc(env(safe-area-inset-right, 0px) + 8px)); width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid var(--line); background: var(--card); color: var(--ink-2); display: grid; place-items: center; cursor: pointer; z-index: 2; }
 .ref-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
 .ref-head h2 { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-lg); }
 .ref-head h2 .ic { width: 20px; height: 20px; color: var(--blue); }
@@ -209,21 +220,23 @@ html.in-game, html.in-game body { background: var(--card); }
 .actions.end { justify-content: flex-end; }
 
 /* ---------- menu: level tiles that fill the screen ---------- */
-.menu-in { min-height: 100vh; min-height: 100dvh; max-width: 980px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
-.tiles { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, minmax(132px, 2fr)) minmax(66px, 1fr); gap: 12px; }
+.menu-in { min-height: 100vh; min-height: 100dvh; max-width: 980px; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+.tiles { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, minmax(110px, 2fr)) repeat(2, minmax(60px, 1fr)); gap: 12px; }
 .tile { display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 6px; text-align: left; padding: 16px; cursor: pointer; border: 1.5px solid var(--line); }
 .tile b { font-size: var(--fs-2xl); font-weight: 800; color: var(--blue); }
 .tile .tnote { font-size: var(--fs-sm); color: var(--ink-2); flex: 1; }
 .tile .tstat { font-size: var(--fs-xs); font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
 .tile:hover, .tile:focus-visible { border-color: var(--blue); }
-.tile.custom { grid-column: span 2; min-height: 0; justify-content: center; }
-.tile.markers { grid-column: span 1; border-color: var(--teal); background: var(--teal-bg); }
+.tile.custom { grid-column: 1 / -1; min-height: 0; flex-direction: row; align-items: center; justify-content: flex-start; gap: 14px; }
+.tile.custom b { flex: none; min-width: 5.2em; }
+.tile.custom .tnote { flex: 1; }
+.tile.markers { border-color: var(--teal); background: var(--teal-bg); }
 .tile.markers b { color: var(--teal); }
 .tile.custom b { font-size: var(--fs-xl); }
 @media (max-width: 700px) {
-  .tiles { grid-template-columns: 1fr 1fr; grid-template-rows: repeat(3, 2fr) 1fr; gap: 10px; }
-  .tile.custom { grid-column: span 1; flex-direction: row; align-items: center; flex-wrap: wrap; }
-  .tile.custom .tnote { display: none; }
+  .tiles { grid-template-columns: 1fr 1fr; grid-template-rows: repeat(3, minmax(0, 2fr)) repeat(2, minmax(56px, 1fr)); gap: 10px; }
+  .tile.custom { gap: 10px; }
+  .tile.custom .tstat { display: none; }
   .tile { padding: 12px 14px; }
   .tile b { font-size: var(--fs-xl); }
   .tile .tnote { font-size: var(--fs-xs); }
@@ -288,14 +301,13 @@ html.in-game, html.in-game body { background: var(--card); }
   .plots figure { padding: 2px; border-radius: 8px; }
   .plots figcaption { font-size: 10.5px; line-height: 13px; }
   .plots.tiny figcaption { font-size: 9.5px; }
-  .panel { flex: 0 0 44%; margin: 0 -8px; padding: 10px 14px calc(12px + env(safe-area-inset-bottom, 0px)); border-radius: 0; border-width: 1px 0 0; box-shadow: none; }
+  .panel { flex: 1 1 0; margin: 0 -8px; padding: 10px max(16px, calc(env(safe-area-inset-right, 0px) + 8px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(16px, calc(env(safe-area-inset-left, 0px) + 8px)); border-radius: 0; border-width: 1px 0 0; box-shadow: none; }
   .panel .sub { display: none; } /* the rules show on wider screens; phones keep the room for plots */
   .panel .btn { min-height: 44px; }
   .panel .btn.mini { min-height: 34px; }
   .dx { min-height: 46px; }
   .padlink { min-width: 48px; }
   .gchip { min-height: 40px; }
-}
 }
 
 /* ---------- Hard: player-placed gates ---------- */
@@ -306,10 +318,7 @@ html.in-game, html.in-game body { background: var(--card); }
 .game.gating .plots figure, .zoom svg { touch-action: none; cursor: crosshair; }
 .zoom-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 8px; font-size: var(--fs-sm); color: var(--muted); font-weight: 600; }
 
-/* Short phones (iPhone SE): a little more room for the plots. */
-@media (max-width: 900px) and (max-height: 700px) {
-  .panel { flex-basis: 42%; }
-}
+
 
 /* ---------- press and hold: no text selection; the latch target ---------- */
 html.holdmode .game, html.holdmode .refpane, html.holdmode .zoom { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
@@ -326,7 +335,7 @@ html.holdmode .plots figure, html.holdmode #refBtn { touch-action: none; }
 
 /* ---------- Markers quiz ---------- */
 .quiz .gtitle span { font-variant-numeric: tabular-nums; }
-.qmain { flex: 1; min-height: 0; overflow: auto; width: 100%; max-width: 620px; margin: 0 auto; padding: 16px 16px calc(20px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 14px; }
+.qmain { flex: 1; min-height: 0; overflow: auto; width: 100%; max-width: 620px; margin: 0 auto; padding: 16px 16px calc(24px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 14px; }
 .qcard { padding: 18px; display: flex; flex-direction: column; gap: 10px; }
 .qcard h2 { margin: 0; font-size: var(--fs-2xl); color: var(--teal); }
 .qcard .sub { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
@@ -340,6 +349,9 @@ html.holdmode .plots figure, html.holdmode #refBtn { touch-action: none; }
 .qkind { font-size: var(--fs-xs); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .qbig { font-size: var(--fs-2xl); font-weight: 800; color: var(--teal); }
 .qopts { display: flex; flex-direction: column; gap: 8px; }
+.qrow-opt .qopt { flex: 1; min-width: 0; }
+.qopt.crossed { color: var(--muted); background: var(--sunk); }
+.qopt.crossed > span:not(.otag) { text-decoration: line-through; }
 .qopt .otag { margin-left: auto; font-size: var(--fs-xs); font-weight: 700; }
 /* feedback: icon + words, color only reinforces */
 .qopt.ok { border-color: var(--blue); background: var(--blue-bg); }
