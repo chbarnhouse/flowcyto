@@ -60,8 +60,56 @@
 .recap .why { color: var(--muted); font-size: var(--fs-xs); margin-top: 2px; }
 .tag-role { font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
 
+/* tabs: Answer · Scratch pad */
+.tabs { display: flex; gap: 4px; align-items: center; margin: -4px 0 12px; border-bottom: 1px solid var(--line); }
+.tabs [role="tab"] { border: 0; background: none; padding: 8px 10px; font-weight: 700; font-size: var(--fs-sm); color: var(--muted); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -1px; }
+.tabs [role="tab"][aria-selected="true"] { color: var(--blue); border-bottom-color: var(--blue); }
+.sheet-tg { display: none; margin-left: auto; border: 1.5px solid var(--line); background: var(--card); border-radius: 8px; width: 36px; height: 32px; place-items: center; cursor: pointer; }
+
+/* scratch pad: + − ± as text first; tint only repeats it */
+.padwrap { overflow-x: auto; margin: 0 -4px; padding: 0 4px; }
+.pad { border-collapse: collapse; font-size: var(--fs-sm); }
+.pad thead th { font-size: var(--fs-xs); font-weight: 700; padding: 0 2px 4px; white-space: nowrap; color: var(--ink-2); }
+.pad tbody th { text-align: left; font-weight: 600; font-size: var(--fs-xs); max-width: 112px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 6px; }
+.pad tr.hl th { color: var(--blue); }
+.pad tr.hl td.pv { box-shadow: inset 0 0 0 1px var(--blue); }
+.pad td.pv { width: 34px; min-width: 34px; height: 30px; border: 1px solid var(--line); text-align: center; padding: 0; font-weight: 800; font-size: var(--fs-sm); }
+.pad td.pv button { width: 100%; height: 100%; border: 0; background: none; cursor: pointer; font: inherit; color: inherit; }
+.pad td.pv.p { background: var(--blue-bg); }
+.pad td.pv.n { background: var(--sunk); color: var(--muted); }
+.pad td.pv.s { background: var(--gold-bg); }
+.pad td.pv.diff span { text-decoration: underline wavy var(--pink); text-underline-offset: 3px; }
+.pad td.rv { padding-left: 6px; white-space: nowrap; }
+.reveal { width: 30px; height: 28px; border: 1.5px solid var(--line); border-radius: 8px; background: var(--card); color: var(--blue); cursor: pointer; display: grid; place-items: center; }
+.btn.mini { min-height: 26px; padding: 2px 8px; font-size: var(--fs-xs); }
+
+.plots figure { cursor: zoom-in; }
+.plots figure.big { grid-column: 1 / -1; cursor: zoom-out; }
+.plots figure.big .dotplot { width: 100%; max-width: 520px; margin: 0 auto; }
+.lgrid tbody th[data-focus] { cursor: pointer; }
+
+/* Phones and narrow tablets: two-column plots, answer panel as a bottom sheet that can shrink. */
 @media (max-width: 900px) {
-  .board { flex-direction: column; }
-  .panel { position: static; flex: 1 1 auto; width: 100%; max-height: none; }
-  .brand { margin-right: 0; width: 100%; }
+  .bar-in { padding: 8px 12px; gap: 8px; }
+  .brand { order: 0; }
+  #newBtn { order: 1; min-height: 34px; }
+  .seg { order: 2; flex: 1 1 100%; }
+  .seg button { flex: 1; padding: 6px 4px; }
+  .board { flex-direction: column; padding: 10px 10px calc(var(--sheet-h, 45vh) + 16px); gap: 0; }
+  .board-head h1 { font-size: var(--fs-lg); }
+  .plots { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .plots figure { padding: 2px 2px 0; border-radius: 10px; }
+  .plots figcaption { font-size: 10px; }
+  .panel { position: fixed; left: 0; right: 0; bottom: 0; top: auto; z-index: 6; width: auto; max-height: 50vh; margin: 0;
+    border-radius: 18px 18px 0 0; padding: 4px 12px calc(12px + env(safe-area-inset-bottom, 0px)); overflow: auto;
+    box-shadow: 0 -8px 30px -12px rgba(20,24,31,.35); }
+  .tabs { position: sticky; top: -4px; z-index: 1; background: var(--card); margin: 0 0 10px; padding-top: 4px; }
+  .sheet-tg { display: grid; }
+  .panel.min { padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px)); }
+  .panel.min .tabbody { display: none; }
+  .panel.min .tabs { margin: 0; border-bottom: 0; }
+  .panel .sub { display: none; } /* rules are on the desktop panel; phones keep the space for plots */
+  .panel h2 { display: none; }
+  .lgrid .colh { max-height: 104px; font-size: 10px; }
+  .lgrid td { width: 30px; height: 30px; }
 }

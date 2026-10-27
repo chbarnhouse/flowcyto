@@ -25,7 +25,7 @@
   function start(mode, level, seed) {
     seed = seed || (Math.random() * 1e9) >>> 0;
     const P = generate(seed, level, mode);
-    S = { mode, level, seed, P, marks: {}, checked: {}, wrongChecks: 0, peeks: new Set(), peekOpen: null, focus: null, phase: 'play', pctPick: null, msg: null };
+    S = { mode, level, seed, P, marks: {}, checked: {}, wrongChecks: 0, peeks: new Set(), pad: {}, padRow: null, tab: 'answer', sheet: (S && S.sheet) || 'open', focus: null, phase: 'play', pctPick: null, msg: null };
     history.replaceState(null, '', `#${mode}/${level}/${seed}`);
     try { localStorage.setItem('flowcyto.prefs', JSON.stringify({ mode, level })); } catch (e) {}
     $('#modeSeg').querySelectorAll('button').forEach(b => b.setAttribute('aria-checked', b.dataset.mode === mode));
@@ -45,38 +45,60 @@
     $('#plots').innerHTML = S.P.plots.map(pl => `<figure>${renderPlot(S.P, pl, { size: 250, focus })}<figcaption>${pl.x === 'LC' ? 'kappa / lambda (surface light chains)' : pl.x + ' / ' + pl.y}</figcaption></figure>`).join('');
   }
 
-  // ---------- an identity's profile on the plots shown ----------
-  function profile(id) {
-    const e = BY[id], chips = [];
-    for (const mk of markersOf(shownPlots())) {
-      const a = allowed(e, mk);
-      let t;
-      if (mk === 'LC') t = e.m.LC === 'clonal' ? 'one light chain only' : e.m.LC === 'poly' ? 'kappa and lambda' : 'no light chain';
-      else if (mk === 'SSC') t = 'SSC ' + a[0];
-      else if (a.length > 1) t = mk + ' ±';
-      else t = describe(mk, a[0]);
-      chips.push(`<span class="chip">${esc(t)}</span>`);
-    }
-    return `<div class="prof"><b>${esc(e.long)}${freePeeks() ? '' : ' · peek'}</b><div class="chips">${chips.join('')}</div></div>`;
+  // ---------- scratch pad: markers sorted by cell type ----------
+  // Easy: a filled reference. Medium/Hard: the player fills it in; Reveal fills one row from the
+  // answer key and counts as a peek (the only way to peek).
+  const PAD_CYCLE = { LC: ['one', 'both', 'none'], SSC: ['low', 'mid', 'high'], CD45: ['+', 'dim', '−'] };
+  const PAD_TEXT = { one: '1', both: '2', none: '−', low: 'lo', mid: 'mid', high: 'hi' };
+  const padCycle = mk => PAD_CYCLE[mk] || ['+', '−', '±'];
+  const padClass = v => (v === '+' || v === 'dim' || v === 'one' || v === 'both') ? 'p' : (v === '−' || v === 'none') ? 'n' : v === '±' ? 's' : '';
+  function truth(id, mk) {
+    const e = BY[id], a = allowed(e, mk);
+    if (mk === 'LC') return e.m.LC === 'clonal' ? 'one' : e.m.LC === 'poly' ? 'both' : 'none';
+    if (mk === 'SSC') return a[0];
+    if (a.length > 1 || a[0] === 'split') return '±';
+    return { neg: '−', pos: '+', dim: 'dim' }[a[0]];
   }
-  function peek(id) {
-    if (S.peekOpen === id) { S.peekOpen = null; return drawPanel(); }
-    S.peekOpen = id;
-    if (!freePeeks()) S.peeks.add(id);
-    drawPanel();
+  const padFilled = id => freePeeks() || S.peeks.has(id);
+  function padHTML() {
+    const mks = markersOf(shownPlots());
+    let h = `<p class="sub">${freePeeks()
+      ? 'Reference for Easy: each cell type on this board, read on the markers these plots show.'
+      : 'Sort the markers by cell type from memory: tap a cell to cycle its value. The eye fills a row from the key and counts as a peek; anything you had wrong gets a wavy underline.'}</p>`;
+    h += `<div class="padwrap"><table class="pad"><thead><tr><th></th>${mks.map(mk => `<th scope="col">${mk === 'LC' ? 'κ/λ' : esc(mk)}</th>`).join('')}${freePeeks() ? '' : '<th></th>'}</tr></thead><tbody>`;
+    for (const id of S.P.pool) {
+      const filled = padFilled(id);
+      h += `<tr class="${S.padRow === id ? 'hl' : ''}" data-padrow="${id}"><th scope="row" title="${esc(BY[id].long)}">${esc(BY[id].name)}</th>`;
+      for (const mk of mks) {
+        const mine = S.pad[id + '|' + mk];
+        if (filled) {
+          const v = truth(id, mk), diff = mine && mine !== v;
+          h += `<td class="pv ${padClass(v)}${diff ? ' diff' : ''}"${diff ? ` title="you had ${esc(PAD_TEXT[mine] || mine)}"` : ''}><span>${esc(PAD_TEXT[v] || v)}</span></td>`;
+        } else {
+          h += `<td class="pv ${padClass(mine)}"><button data-pad="${id}|${mk}" aria-label="${esc(BY[id].name)}, ${esc(mk)}: ${mine ? esc(mine) : 'blank'}">${mine ? esc(PAD_TEXT[mine] || mine) : ''}</button></td>`;
+        }
+      }
+      if (!freePeeks()) h += `<td class="rv">${filled ? '<span class="tally" title="peeked">seen</span>' : `<button class="reveal" data-reveal="${id}" aria-label="Reveal ${esc(BY[id].name)} (counts as a peek)" title="Reveal (counts as a peek)"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8z" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="8" r="2.1" fill="currentColor"/></svg></button>`}</td>`;
+      h += '</tr>';
+    }
+    return h + '</tbody></table></div><p class="help">± partly positive, or varies by patient · κ/λ: 1 = one light chain (clonal), 2 = both, − = none · SSC lo / mid / hi.</p>';
+  }
+  function jumpToPad(id) {
+    S.tab = 'pad'; S.padRow = id; S.sheet = 'open'; drawPanel();
+    const r = document.querySelector(`[data-padrow="${id}"]`); if (r) r.scrollIntoView({ block: 'nearest' });
   }
 
   // ---------- panel ----------
   function drawPanel() {
     const P = S.P, el = $('#panel');
-    const tally = `<span class="tally">${S.wrongChecks} wrong check${S.wrongChecks === 1 ? '' : 's'} · ${freePeeks() ? 'profiles free on Easy' : S.peeks.size + ' peek' + (S.peeks.size === 1 ? '' : 's')}</span>`;
+    const tally = `<span class="tally">${S.wrongChecks} wrong check${S.wrongChecks === 1 ? '' : 's'} · ${freePeeks() ? 'pad filled on Easy' : S.peeks.size + ' peek' + (S.peeks.size === 1 ? '' : 's')}</span>`;
     let h = '';
     if (S.mode === 'pops') {
-      h += `<h2>Name every population</h2><p class="sub">Give each letter an identity. Decoys are mixed in; no identity is used twice. Click a cell: ruled out, then chosen, then blank. ${freePeeks() ? 'Click a column name to see its profile.' : 'Click a column name to peek at its profile (counts as a peek).'}</p>`;
-      h += `<table class="lgrid"><thead><tr><th></th>${P.pool.map(id => `<th><button class="colh" data-peek="${id}" title="${esc(BY[id].long)}">${esc(BY[id].name)}</button></th>`).join('')}</tr></thead><tbody>`;
+      h += `<h2>Name every population</h2><p class="sub">Give each letter an identity. Decoys are mixed in; no identity is used twice. Click a cell: ruled out, then chosen, then blank. Tap a letter to highlight it in every plot; tap a column name to find it in the scratch pad.</p>`;
+      h += `<table class="lgrid"><thead><tr><th></th>${P.pool.map(id => `<th><button class="colh" data-jump="${id}" title="${esc(BY[id].long)}">${esc(BY[id].name)}</button></th>`).join('')}</tr></thead><tbody>`;
       for (const p of P.pops) {
         const c = S.checked[p.label];
-        h += `<tr data-row="${p.label}" class="${S.focus === p.slot ? 'focus' : ''}"><th>${popTag(p)}${c ? `<span class="rowmark ${c}">${ICON[c]}${c}</span>` : ''}</th>`;
+        h += `<tr data-row="${p.label}" class="${S.focus === p.slot ? 'focus' : ''}"><th data-focus="${p.label}">${popTag(p)}${c ? `<span class="rowmark ${c}">${ICON[c]}${c}</span>` : ''}</th>`;
         for (const id of P.pool) {
           const m = S.marks[p.label + '|' + id];
           h += `<td class="${m || ''}"><button data-cell="${p.label}|${id}" ${S.phase !== 'play' ? 'disabled' : ''} aria-label="${p.label}, ${esc(BY[id].name)}: ${m ? MARK_WORD[m] : 'blank'}">${m ? ICON[m] : ''}</button></td>`;
@@ -84,7 +106,6 @@
         h += '</tr>';
       }
       h += '</tbody></table>';
-      if (S.peekOpen) h += profile(S.peekOpen);
       const ready = P.pops.every(p => P.pool.some(id => S.marks[p.label + '|' + id] === 'yes'));
       if (S.phase === 'play') h += `<div class="actions"><button class="btn primary" data-act="check" ${ready ? '' : 'disabled'}>Check</button>${tally}</div>${ready ? '' : '<p class="help">Choose one identity in every row to check.</p>'}`;
     } else {
@@ -92,8 +113,7 @@
       h += `<h2>Diagnose the clone</h2><p class="sub">Population ${popTag(t)} is abnormal; the rest of the tube is faded background. Strike out what the plots rule out, then choose. Click a name: ruled out, then chosen, then blank.</p>`;
       for (const id of P.pool) {
         const m = S.marks['dx|' + id], c = S.checked[id];
-        h += `<button class="dx ${m || ''}" data-dx="${id}" ${S.phase !== 'play' ? 'disabled' : ''}>${m ? ICON[m] : '<span class="ic"></span>'}<span class="nm">${esc(BY[id].name)}</span>${c ? `<span class="rowmark ${c}">${ICON[c]}${c}</span>` : ''}<span class="peek" data-peek="${id}" role="button" tabindex="0">profile</span></button>`;
-        if (S.peekOpen === id) h += profile(id);
+        h += `<button class="dx ${m || ''}" data-dx="${id}" ${S.phase !== 'play' ? 'disabled' : ''}>${m ? ICON[m] : '<span class="ic"></span>'}<span class="nm">${esc(BY[id].name)}</span>${c ? `<span class="rowmark ${c}">${ICON[c]}${c}</span>` : ''}<span class="peek" data-jump="${id}" role="button" tabindex="0">in pad</span></button>`;
       }
       const ready = P.pool.some(id => S.marks['dx|' + id] === 'yes');
       if (S.phase === 'play') h += `<div class="actions"><button class="btn primary" data-act="check" ${ready ? '' : 'disabled'}>Diagnose</button>${tally}</div>`;
@@ -104,7 +124,12 @@
       h += `<div class="msg"><b>Last step.</b> Population ${popTag(t)} is about what share of all events?<div class="pctq">${P.pct.options.map(v => `<button class="btn" data-pct="${v}">${v}%</button>`).join('')}</div></div>`;
     }
     if (S.phase === 'done') h += recap();
-    el.innerHTML = h;
+    const tab = (k, t) => `<button role="tab" data-tab="${k}" aria-selected="${S.tab === k}">${t}</button>`;
+    const chev = S.sheet === 'min' ? 'M4 10l4-4 4 4' : 'M4 6l4 4 4-4';
+    el.innerHTML = `<div class="tabs" role="tablist">${tab('answer', 'Answer')}${tab('pad', freePeeks() ? 'Reference' : 'Scratch pad')}<button class="sheet-tg" data-sheet aria-label="${S.sheet === 'min' ? 'Show the panel' : 'Shrink the panel'}"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="${chev}" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div><div class="tabbody">${S.tab === 'pad' ? padHTML() : h}</div>`;
+    el.classList.toggle('min', S.sheet === 'min');
+    // Phones: the panel is a bottom sheet; keep the plots scrollable above it.
+    document.documentElement.style.setProperty('--sheet-h', el.offsetHeight + 'px');
   }
 
   // ---------- checking ----------
@@ -181,8 +206,21 @@
   // ---------- input ----------
   const cycle = m => m === undefined ? 'no' : m === 'no' ? 'yes' : undefined;
   $('#panel').addEventListener('click', ev => {
-    const pk = ev.target.closest('[data-peek]');
-    if (pk) { ev.stopPropagation(); return peek(pk.dataset.peek); }
+    const tb = ev.target.closest('[data-tab]');
+    if (tb) { S.tab = tb.dataset.tab; S.sheet = 'open'; return drawPanel(); }
+    if (ev.target.closest('[data-sheet]')) { S.sheet = S.sheet === 'min' ? 'open' : 'min'; return drawPanel(); }
+    const jp = ev.target.closest('[data-jump]');
+    if (jp) { ev.stopPropagation(); return jumpToPad(jp.dataset.jump); }
+    const pc = ev.target.closest('[data-pad]');
+    if (pc) {
+      const [id, mk] = pc.dataset.pad.split('|'), key = id + '|' + mk, c = padCycle(mk), i = c.indexOf(S.pad[key]);
+      if (i === c.length - 1) delete S.pad[key]; else S.pad[key] = c[i + 1];
+      return drawPanel();
+    }
+    const rv = ev.target.closest('[data-reveal]');
+    if (rv) { S.peeks.add(rv.dataset.reveal); S.padRow = rv.dataset.reveal; return drawPanel(); }
+    const fc = ev.target.closest('[data-focus]');
+    if (fc) { const slot = S.P.pops.find(p => p.label === fc.dataset.focus).slot; S.focus = S.focus === slot ? null : slot; drawPlots(); return drawPanel(); }
     const cell = ev.target.closest('[data-cell]');
     if (cell) {
       const [row, id] = cell.dataset.cell.split('|'), key = row + '|' + id, next = cycle(S.marks[key]);
@@ -210,12 +248,15 @@
   });
   // Pointing at a row highlights that population in every plot.
   $('#panel').addEventListener('mouseover', ev => {
-    if (S.mode !== 'pops') return;
+    if (S.mode !== 'pops' || !matchMedia('(hover: hover)').matches) return;
     const tr = ev.target.closest('tr[data-row]');
     const slot = tr ? S.P.pops.find(p => p.label === tr.dataset.row).slot : null;
     if (slot !== S.focus) { S.focus = slot; drawPlots(); $('#panel').querySelectorAll('tr[data-row]').forEach(r => r.classList.toggle('focus', tr === r)); }
   });
-  $('#panel').addEventListener('mouseleave', () => { if (S.focus != null) { S.focus = null; drawPlots(); } });
+  $('#panel').addEventListener('mouseleave', () => { if (matchMedia('(hover: hover)').matches && S.focus != null) { S.focus = null; drawPlots(); } });
+  // Tap a plot to show it full width (mostly for phones).
+  $('#plots').addEventListener('click', ev => { const f = ev.target.closest('figure'); if (f) f.classList.toggle('big'); });
+  window.addEventListener('resize', () => document.documentElement.style.setProperty('--sheet-h', $('#panel').offsetHeight + 'px'));
   $('#modeSeg').addEventListener('click', ev => { const b = ev.target.closest('[data-mode]'); if (b) start(b.dataset.mode, S.level); });
   $('#levelSeg').addEventListener('click', ev => { const b = ev.target.closest('[data-level]'); if (b) start(S.mode, b.dataset.level); });
   $('#newBtn').addEventListener('click', () => start(S.mode, S.level));
