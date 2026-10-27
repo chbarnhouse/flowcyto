@@ -139,6 +139,65 @@
 .theme-sw i { display: block; height: 6px; width: 70%; border-radius: 3px; }
 .board-head .pill { white-space: nowrap; }
 
+/* ---------- menu: gear, six levels + custom, legend ---------- */
+.menu-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.gearbtn { flex: none; width: 46px; height: 46px; display: grid; place-items: center; border-radius: 14px; border: 1.5px solid var(--line); background: var(--card); color: var(--ink-2); cursor: pointer; margin-top: 4px; }
+.gearbtn .ic { width: 22px; height: 22px; }
+.lvls { grid-template-columns: repeat(3, 1fr) !important; }
+.lvl.custom { width: 100%; margin-top: 8px; flex-direction: row; justify-content: center; gap: 10px; padding: 10px; background: var(--card); border-style: dashed; }
+.legend { padding: 16px 18px; }
+.legend h2 { font-size: var(--fs-lg); margin-bottom: 6px; }
+.legend dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font-size: var(--fs-sm); }
+.legend dt { font-weight: 800; }
+.legend dd { margin: 0; color: var(--ink-2); }
+
+/* ---------- answer panel: heading, reference button, centered grids ---------- */
+.ans-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.ans-head h2 { font-size: var(--fs-lg); }
+.refbtn { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 6px 14px; border-radius: 999px; border: 1.5px solid var(--blue); background: var(--blue-bg); color: var(--blue); font-weight: 700; font-size: var(--fs-sm); cursor: pointer; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
+.gridwrap { overflow-x: auto; margin: 0 -4px 6px; padding: 0 4px 4px; -webkit-overflow-scrolling: touch; }
+.gridwrap > table { margin: 0 auto; }
+.gridwrap.scrolls tbody th, .gridwrap.scrolls thead th:first-child { position: sticky; left: 0; z-index: 1; background: var(--card); box-shadow: 4px 0 6px -4px rgba(20,24,31,.25); }
+.lgrid { font-size: calc(var(--fs-sm) * var(--gs, 1)); }
+.lgrid td { width: var(--cell, 32px) !important; height: var(--row, var(--cell, 32px)) !important; }
+.lgrid thead th:not(:first-child):not(.addcol) { width: var(--cell, 32px); min-width: var(--cell, 32px); max-width: var(--cell, 32px); }
+.lgrid .colh { width: 100%; }
+.lgrid.flat .colh { writing-mode: horizontal-tb; transform: none; white-space: normal; text-align: center; line-height: 1.2; padding: 4px 2px; }
+.lgrid.flat thead th { vertical-align: bottom; }
+.lgrid .colh { font-size: calc(var(--fs-xs) * var(--gs, 1)); max-height: none; }
+.lgrid td.addcol, .lgrid th.addcol { border: 0; width: auto !important; vertical-align: bottom; }
+.empty { text-align: center; color: var(--muted); font-size: var(--fs-sm); margin: 10px 0; }
+.dxlist { display: flex; flex-direction: column; gap: 0; }
+.adddx { margin-top: 2px; }
+
+/* add a cell type: a native select laid over a "+" face, so phones get their own picker */
+.addsel { position: relative; display: inline-flex; }
+.addsel-face { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 4px 12px; border: 1.5px dashed var(--blue); border-radius: 10px; color: var(--blue); font-weight: 700; font-size: var(--fs-sm); background: var(--card); white-space: nowrap; }
+.addsel select { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; font-size: 16px; }
+.addcol .addsel-face span { display: none; }
+.addcol .addsel-face { min-height: 32px; padding: 4px 8px; }
+
+/* ---------- reference / scratch pad overlay ---------- */
+.refpane { position: fixed; inset: 0; z-index: 25; background: rgba(10,12,16,.45); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.refpane-in { width: min(760px, 100%); max-height: calc(100vh - 32px); overflow: auto; padding: 14px 16px 16px; }
+.ref-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+.ref-head h2 { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-lg); }
+.ref-head h2 .ic { width: 20px; height: 20px; color: var(--blue); }
+.refpane .sub { font-size: var(--fs-sm); color: var(--muted); margin: 0 0 10px; }
+.ref-foot { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 8px 0; }
+.pad { font-size: calc(var(--fs-sm) * var(--gs, 1)); }
+.pad td.pv { width: var(--cell, 34px) !important; min-width: var(--cell, 34px) !important; height: calc(var(--cell, 34px) * .9) !important; }
+.pad.ro td.pv { font-size: calc(var(--fs-xs) * var(--gs, 1) * 1.1); }
+.pad thead th { font-size: calc(var(--fs-xs) * var(--gs, 1)); }
+.pad tbody th { font-size: calc(var(--fs-xs) * var(--gs, 1)); max-width: calc(116px * var(--gs, 1)); }
+.rowh { border: 0; background: none; padding: 0; font: inherit; color: var(--blue); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; text-align: left; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* action sheet (column / row options) and custom setup reuse the settings dialog */
+.btn.wide { width: 100%; justify-content: center; margin: 6px 0; min-height: 44px; }
+.field { display: flex; flex-direction: column; gap: 4px; margin: 10px 0; font-weight: 700; font-size: var(--fs-sm); }
+.field select { min-height: 44px; border: 1.5px solid var(--line); border-radius: 10px; padding: 0 10px; font: inherit; font-size: 16px; background: var(--card); color: var(--ink); }
+.actions.end { justify-content: flex-end; }
+
 /* ---------- daily boards, timer, why replay, coach marks ---------- */
 .daily { padding: 16px 18px; }
 .dhead { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
@@ -174,44 +233,34 @@
 /* ---------- phones and narrow tablets: plots above, the panel as a bottom sheet ---------- */
 @media (max-width: 900px) {
   .bar-in { padding: 6px 8px; gap: 2px; }
-  .iconbtn { padding: 6px 8px; }
+  .iconbtn { padding: 6px 8px; min-height: 44px; min-width: 44px; justify-content: center; }
   .iconbtn span { display: none; }
   #hintBtn span { display: inline; }
-  .lvl { padding: 10px 2px; }
-  .lvl b { font-size: var(--fs-md); }
   .dbtns { grid-template-columns: 1fr; }
-  #newBtn { min-height: 34px; padding: 4px 12px; }
+  #newBtn { min-height: 40px; padding: 4px 12px; }
   #newBtn .wide { display: none; }
-  .board { flex-direction: column; padding: 8px 8px 0; gap: 8px; }
+  .gtitle .long { display: none; }
+  .gtitle .short { display: inline; }
+  /* plots above, the answer below on the same page: no sheet to open or close */
+  .board { flex-direction: column; padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px)); gap: 8px; }
   .board-head { margin-bottom: 6px; }
   .board-head h1 { font-size: var(--fs-md); }
+  .board-head .pill { font-size: 10px; padding: 1px 8px; }
   .plots { gap: 6px; }
   .plots figure { padding: 2px; border-radius: 8px; }
-  .plots figcaption { font-size: 10px; line-height: 11px; }
-  .panel { flex: 0 0 46%; margin: 0 -8px; border-radius: 18px 18px 0 0; border-bottom: 0; padding: 4px 12px calc(12px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -8px 30px -12px rgba(20,24,31,.35); }
-  .panel.min { flex: 0 0 auto; padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px)); }
-  .panel.min .tabbody { display: none; }
-  .panel.min .tabs { margin: 0; border-bottom: 0; }
-  .tabs { position: sticky; top: -4px; z-index: 1; background: var(--card); margin: 0 0 10px; padding-top: 4px; }
-  .sheet-tg { display: grid; }
+  .plots figcaption { font-size: 10.5px; line-height: 13px; }
+  .plots.tiny figcaption { font-size: 9.5px; }
+  .panel { flex: 0 0 44%; padding: 10px 12px 12px; }
   .panel .sub { display: none; } /* the rules show on wider screens; phones keep the room for plots */
-  .lgrid .colh { max-height: none; font-size: 10px; padding: 2px 1px; }
-  .iconbtn { min-height: 44px; min-width: 44px; justify-content: center; }
-  #newBtn { min-height: 40px; }
-  .tabs [role="tab"] { padding: 11px 12px; }
-  .sheet-tg { width: 44px; height: 38px; }
   .panel .btn { min-height: 44px; }
   .panel .btn.mini { min-height: 34px; }
   .dx { min-height: 46px; }
   .padlink { min-width: 48px; }
   .gchip { min-height: 40px; }
-  .pad td.pv { width: 38px; min-width: 38px; height: 36px; }
-  .reveal { width: 36px; height: 34px; }
-  .board-head .pill { font-size: 10px; padding: 1px 8px; }
-  .gtitle .long { display: none; }
-  .gtitle .short { display: inline; }
-  .plots.tiny figcaption { font-size: 9.5px; }
-  .plots figcaption { font-size: 10.5px; line-height: 13px; }
+  /* the reference opens as a card from the bottom, as tall as its table */
+  .refpane { padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px)); align-items: flex-end; }
+  .refpane-in { max-height: calc(100vh - 60px - env(safe-area-inset-top, 0px)); border-radius: 18px; }
+}
 }
 
 /* ---------- Hard: player-placed gates ---------- */

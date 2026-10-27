@@ -56,8 +56,9 @@
       if (!isScatter(xm)) out.push(`<line x1="${sx(d)}" y1="${T + H}" x2="${sx(d)}" y2="${T + H + 4}" class="dp-tick"/>`);
       if (!isScatter(ym)) out.push(`<line x1="${L - 4}" y1="${sy(d)}" x2="${L}" y2="${sy(d)}" class="dp-tick"/>`);
     }
-    const gate = opts.gate;
-    if (!gate) {
+    // gate: the player's gate, 'none' on a gated board with no gate placed yet (no lines, no hints)
+    const gate = opts.gate && opts.gate !== 'none' ? opts.gate : null, gated = !!opts.gate;
+    if (!gated) {
       if (!isScatter(xm)) out.push(`<line x1="${sx(CUT)}" y1="${T}" x2="${sx(CUT)}" y2="${T + H}" class="dp-cut"/>`);
       if (!isScatter(ym)) out.push(`<line x1="${L}" y1="${sy(CUT)}" x2="${L + W}" y2="${sy(CUT)}" class="dp-cut"/>`);
     }
@@ -84,7 +85,7 @@
     }
     if (gate) {
       if (gate.y1 != null) {
-        for (const y of [gate.y1, gate.y2]) out.push(`<line x1="${L}" y1="${sy(y)}" x2="${L + W}" y2="${sy(y)}" class="dp-gate"/><circle cx="${L + W - 9}" cy="${sy(y)}" r="6" class="dp-handle"/>`);
+        for (const y of [gate.y1, gate.y2].filter(v => v != null)) out.push(`<line x1="${L}" y1="${sy(y)}" x2="${L + W}" y2="${sy(y)}" class="dp-gate"/><circle cx="${L + W - 9}" cy="${sy(y)}" r="6" class="dp-handle"/>`);
       } else {
         out.push(`<line x1="${sx(gate.x)}" y1="${T}" x2="${sx(gate.x)}" y2="${T + H}" class="dp-gate"/><line x1="${L}" y1="${sy(gate.y)}" x2="${L + W}" y2="${sy(gate.y)}" class="dp-gate"/><circle cx="${sx(gate.x)}" cy="${sy(gate.y)}" r="7" class="dp-handle"/>`);
       }
@@ -93,8 +94,8 @@
     if (!opts.compact) {
     out.push(`<text x="${L + W / 2}" y="${S - 6}" class="dp-ax" text-anchor="middle">${label(xm)}</text>`);
     out.push(`<text x="12" y="${T + H / 2}" class="dp-ax" text-anchor="middle" transform="rotate(-90 12 ${T + H / 2})">${label(ym)}</text>`);
-    if (!gate && !isScatter(xm)) out.push(`<text x="${(L + sx(CUT)) / 2}" y="${T + H + 12}" class="dp-q" text-anchor="middle">−</text><text x="${(sx(CUT) + L + W) / 2}" y="${T + H + 12}" class="dp-q" text-anchor="middle">+</text>`);
-    if (!gate && !isScatter(ym)) out.push(`<text x="${L - 9}" y="${(T + sy(CUT)) / 2 + 4}" class="dp-q" text-anchor="middle">+</text><text x="${L - 9}" y="${(sy(CUT) + T + H) / 2 + 4}" class="dp-q" text-anchor="middle">−</text>`);
+    if (!gated && !isScatter(xm)) out.push(`<text x="${(L + sx(CUT)) / 2}" y="${T + H + 12}" class="dp-q" text-anchor="middle">−</text><text x="${(sx(CUT) + L + W) / 2}" y="${T + H + 12}" class="dp-q" text-anchor="middle">+</text>`);
+    if (!gated && !isScatter(ym)) out.push(`<text x="${L - 9}" y="${(T + sy(CUT)) / 2 + 4}" class="dp-q" text-anchor="middle">+</text><text x="${L - 9}" y="${(sy(CUT) + T + H) / 2 + 4}" class="dp-q" text-anchor="middle">−</text>`);
     }
     if (labels === 'full') {
       out.push(badges(pops.map((p, k) => ({ slot: p.slot, label: p.label, events: ev[k] })), g, opts.focus, null));
@@ -137,7 +138,8 @@
 
   /* Which part of a gate an event falls in: 0–3 for a quad gate (2·right + top), 0–2 SSC bands on FSC/SSC. */
   function gateCode(ev, plot, gate) {
-    if (gate.y1 != null) { const v = ev.SSC; return v < gate.y1 ? 0 : v < gate.y2 ? 1 : 2; }
+    if (!gate) return 0;
+    if (gate.y1 != null) { const v = ev.SSC; return v < gate.y1 ? 0 : (gate.y2 == null || v < gate.y2) ? 1 : 2; }
     const [xm, ym] = axes(plot);
     return (axisVal(ev, xm) > gate.x ? 2 : 0) + (axisVal(ev, ym) > gate.y ? 1 : 0);
   }

@@ -7,10 +7,13 @@ A flow cytometry logic puzzle for STEP 1, a companion to Step 1 Pathways. Read t
 - **Diagnose the clone**: one abnormal population against a list of look-alike neoplasms.
 
 **Levels:**
-- **Easy:** more plots, and the reference table comes filled in.
-- **Medium:** the minimum set of plots; peeking at the reference counts against you.
-- **Hard:** no labels: you drag a quad gate on each plot, and the events sort themselves into lettered groups.
-- **Extreme:** gates, five populations that touch, a red-herring plot, and a "what share of events" question.
+- **Easy:** just the plots and cell types you need; the reference is filled in.
+- **Medium:** extra plots and a few cell types that aren't in the tube; reference filled in.
+- **Hard:** like Medium, but you fill in a scratch pad instead of a reference.
+- **Expert:** no labels: you place every quad gate, and the events sort themselves into lettered groups.
+- **Master:** gates, extra plots, absent cell types, and populations that touch.
+- **Extreme:** gates, and you choose which cell types to consider from the whole catalog, plus a share-of-events question.
+- **Custom:** set each of these yourself.
 
 ## Run it
 Static files with no build step and no dependencies:
