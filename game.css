@@ -35,7 +35,8 @@
 .iconbtn:disabled { opacity: .4; cursor: default; }
 .gtitle { display: flex; flex-direction: column; line-height: 1.15; margin-right: auto; min-width: 0; }
 .gtitle b { font-size: var(--fs-md); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.gtitle span { font-size: var(--fs-xs); color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.gtitle .short { display: none; }
+.gtitle > span { font-size: var(--fs-xs); color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
 .board { flex: 1; min-height: 0; width: 100%; max-width: 1400px; margin: 0 auto; padding: 12px 16px 16px; display: flex; gap: 16px; }
 .plots-col { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .board-head { flex: none; display: flex; gap: 10px; align-items: baseline; margin-bottom: 8px; min-width: 0; }
@@ -61,7 +62,7 @@
 .lgrid .colh { writing-mode: vertical-rl; transform: rotate(180deg); text-align: left; white-space: nowrap; font-size: var(--fs-xs); font-weight: 700; border: 0; background: none; cursor: pointer; padding: 4px 2px; color: var(--ink-2); max-height: 150px; overflow: hidden; text-overflow: ellipsis; }
 .lgrid .colh:hover { color: var(--blue); text-decoration: underline; }
 .lgrid tbody th { text-align: left; white-space: nowrap; padding-right: 8px; font-weight: 700; cursor: pointer; }
-.lgrid td { width: 32px; height: 32px; border: 1px solid var(--line); padding: 0; }
+.lgrid td { width: var(--cell, 32px); height: var(--cell, 32px); border: 1px solid var(--line); padding: 0; }
 .lgrid td button { width: 100%; height: 100%; border: 0; background: none; cursor: pointer; display: grid; place-items: center; }
 .lgrid td.no { background: var(--sunk); }
 .lgrid td.yes { background: var(--blue-bg); }
@@ -163,6 +164,13 @@
 .coach-card .actions { justify-content: flex-end; margin-bottom: 0; }
 .coach-card .actions .tally { margin-right: auto; }
 
+/* Launched from the home screen: iOS 26 softens the top edge of the page under the status bar, so
+   give the bar's contents room to clear it. */
+@media (display-mode: standalone) {
+  .bar { padding-top: calc(env(safe-area-inset-top, 0px) + 10px); }
+  .menu-in { padding-top: calc(env(safe-area-inset-top, 0px) + 24px); }
+}
+
 /* ---------- phones and narrow tablets: plots above, the panel as a bottom sheet ---------- */
 @media (max-width: 900px) {
   .bar-in { padding: 6px 8px; gap: 2px; }
@@ -188,7 +196,22 @@
   .sheet-tg { display: grid; }
   .panel .sub { display: none; } /* the rules show on wider screens; phones keep the room for plots */
   .lgrid .colh { max-height: none; font-size: 10px; padding: 2px 1px; }
-  .lgrid td { width: 30px; height: 30px; }
+  .iconbtn { min-height: 44px; min-width: 44px; justify-content: center; }
+  #newBtn { min-height: 40px; }
+  .tabs [role="tab"] { padding: 11px 12px; }
+  .sheet-tg { width: 44px; height: 38px; }
+  .panel .btn { min-height: 44px; }
+  .panel .btn.mini { min-height: 34px; }
+  .dx { min-height: 46px; }
+  .padlink { min-width: 48px; }
+  .gchip { min-height: 40px; }
+  .pad td.pv { width: 38px; min-width: 38px; height: 36px; }
+  .reveal { width: 36px; height: 34px; }
+  .board-head .pill { font-size: 10px; padding: 1px 8px; }
+  .gtitle .long { display: none; }
+  .gtitle .short { display: inline; }
+  .plots.tiny figcaption { font-size: 9.5px; }
+  .plots figcaption { font-size: 10.5px; line-height: 13px; }
 }
 
 /* ---------- Hard: player-placed gates ---------- */
@@ -198,3 +221,8 @@
 .gchip[aria-pressed="true"] { border: 3px solid var(--blue); background: var(--blue-bg); }
 .game.gating .plots figure, .zoom svg { touch-action: none; cursor: crosshair; }
 .zoom-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 8px; font-size: var(--fs-sm); color: var(--muted); font-weight: 600; }
+
+/* Short phones (iPhone SE): a little more room for the plots. */
+@media (max-width: 900px) and (max-height: 700px) {
+  .panel { flex-basis: 42%; }
+}

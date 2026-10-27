@@ -9,6 +9,8 @@
   const COLORS = ['var(--blue)', 'var(--orange)', 'var(--pink)', 'var(--teal)', 'var(--gold)'];
   const CUT = 1.2;
   const GEOM = { L: 36, B: 30, T: 8, R: 8 };
+  // Compact (small plots on phones): the frame fills the tile and the caption names the axes.
+  const GEOM_COMPACT = { L: 5, B: 5, T: 5, R: 5 };
 
   function glyph(shape, x, y, s) {
     switch (shape) {
@@ -32,8 +34,8 @@
   const isFscSsc = plot => plot.x === 'FSC' && plot.y === 'SSC';
 
   /* Plot geometry for a size, with scales both ways (data <-> SVG units). */
-  function geom(plot, S = 240) {
-    const { L, B, T, R } = GEOM, W = S - L - R, H = S - T - B, [xm, ym] = axes(plot);
+  function geom(plot, S = 240, compact = false) {
+    const { L, B, T, R } = compact ? GEOM_COMPACT : GEOM, W = S - L - R, H = S - T - B, [xm, ym] = axes(plot);
     const fx = isScatter(xm) ? 1024 : 4, fy = isScatter(ym) ? 1024 : 4;
     return { S, L, T, W, H, xm, ym,
       sx: v => L + v / fx * W, sy: v => T + H - v / fy * H,
@@ -47,10 +49,10 @@
      gate: the player's quad gate, in data units — {x, y} (a crosshair with a handle), or {y1, y2}
      on FSC/SSC (two side-scatter lines). With a gate there are no −/+ hints at the fixed cut. */
   function renderPlot(puzzle, plot, opts = {}) {
-    const g = geom(plot, opts.size || 240), { S, L, T, W, H, xm, ym, sx, sy } = g;
+    const g = geom(plot, opts.size || 240, opts.compact), { S, L, T, W, H, xm, ym, sx, sy } = g;
     const out = [`<svg class="dotplot" viewBox="0 0 ${S} ${S}" width="${S}" height="${S}" role="img" aria-label="${label(xm)} versus ${label(ym)}">`];
     out.push(`<rect x="${L}" y="${T}" width="${W}" height="${H}" class="dp-frame"/>`);
-    for (let d = 1; d < 4; d++) { // decade ticks on log axes
+    for (let d = 1; d < 4 && !opts.compact; d++) { // decade ticks on log axes
       if (!isScatter(xm)) out.push(`<line x1="${sx(d)}" y1="${T + H}" x2="${sx(d)}" y2="${T + H + 4}" class="dp-tick"/>`);
       if (!isScatter(ym)) out.push(`<line x1="${L - 4}" y1="${sy(d)}" x2="${L}" y2="${sy(d)}" class="dp-tick"/>`);
     }
@@ -88,10 +90,12 @@
       }
     }
     // axes
+    if (!opts.compact) {
     out.push(`<text x="${L + W / 2}" y="${S - 6}" class="dp-ax" text-anchor="middle">${label(xm)}</text>`);
     out.push(`<text x="12" y="${T + H / 2}" class="dp-ax" text-anchor="middle" transform="rotate(-90 12 ${T + H / 2})">${label(ym)}</text>`);
     if (!gate && !isScatter(xm)) out.push(`<text x="${(L + sx(CUT)) / 2}" y="${T + H + 12}" class="dp-q" text-anchor="middle">−</text><text x="${(sx(CUT) + L + W) / 2}" y="${T + H + 12}" class="dp-q" text-anchor="middle">+</text>`);
     if (!gate && !isScatter(ym)) out.push(`<text x="${L - 9}" y="${(T + sy(CUT)) / 2 + 4}" class="dp-q" text-anchor="middle">+</text><text x="${L - 9}" y="${(sy(CUT) + T + H) / 2 + 4}" class="dp-q" text-anchor="middle">−</text>`);
+    }
     if (labels === 'full') {
       out.push(badges(pops.map((p, k) => ({ slot: p.slot, label: p.label, events: ev[k] })), g, opts.focus, null));
     } else if (labels === 'none' && opts.paint && opts.paintLabels) {

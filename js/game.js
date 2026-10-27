@@ -18,9 +18,9 @@
   };
   const MARK_WORD = { no: 'ruled out', yes: 'chosen' };
   const MODES = {
-    pops: { name: 'Name every population', blurb: 'Give every population in the tube an identity. Decoys are mixed in and none is used twice, so letters settle each other like a logic grid.',
+    pops: { name: 'Name every population', short: 'Populations', blurb: 'Give every population in the tube an identity. Decoys are mixed in and none is used twice, so letters settle each other like a logic grid.',
       icon: '<svg viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="3" width="26" height="26" rx="5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 12h26M3 21h26M12 3v26M21 3v26" stroke="currentColor" stroke-width="1.4"/><circle cx="7.5" cy="7.5" r="2.4" fill="currentColor"/><path d="M16.5 14.2l2.6 4.3h-5.2z" fill="currentColor"/></svg>' },
-    clone: { name: 'Diagnose the clone', blurb: 'One population is abnormal. Read its markers against the background and strike out look-alike neoplasms until one is left.',
+    clone: { name: 'Diagnose the clone', short: 'Diagnose', blurb: 'One population is abnormal. Read its markers against the background and strike out look-alike neoplasms until one is left.',
       icon: '<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="12.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="16" cy="16" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="16" cy="16" r="2.2" fill="currentColor"/></svg>' },
   };
 
@@ -59,6 +59,14 @@
   function applyTheme() {
     const a = prefs.appearance, dark = a.mode === 'dark' || (a.mode === 'auto' && !!(darkScheme && darkScheme.matches));
     document.documentElement.setAttribute('data-theme', dark ? a.dark : a.light);
+    syncStatusBar();
+  }
+  /* iOS paints the status bar (and Android the browser bar) in theme-color. Match it to whatever sits
+     right under it, the game's top bar or the menu page, so the two read as one surface. */
+  function syncStatusBar() {
+    const el = !$('#game').hidden ? $('.bar') : document.body;
+    const m = document.querySelector('meta[name="theme-color"]');
+    if (el && m) m.setAttribute('content', getComputedStyle(el).backgroundColor);
   }
   if (darkScheme && darkScheme.addEventListener) darkScheme.addEventListener('change', () => { if (prefs.appearance.mode === 'auto') applyTheme(); });
   const THEME_SWATCH = { default: ['#1d5fa8', '#ffffff', '#1d5fa8'], light: ['#f6f7f9', '#ffffff', '#1d5fa8'], dark: ['#0f1217', '#181d25', '#7fb2ea'], black: ['#000000', '#0e0f12', '#7fb2ea'] };
@@ -105,6 +113,7 @@
     }
     h += `<div class="menu-foot on-page"><span class="muted">Easy: more plots, reference filled in · Medium: fewest plots · Hard: no labels, you place the gates · Extreme: gates, five populations that touch, a red herring and a share-of-events question</span><button class="btn" data-settings>Settings</button></div></main>`;
     $('#menu').innerHTML = h;
+    syncStatusBar();
   }
   $('#menu').addEventListener('click', ev => {
     const p = ev.target.closest('[data-play]'); if (p) { const [m, l] = p.dataset.play.split('/'); return play(m, l); }
@@ -129,13 +138,13 @@
     $('#game').classList.toggle('gating', gating());
     if (location.hash.slice(1) !== `${mode}/${level}/${seed}`) history.replaceState(null, '', `#${mode}/${level}/${seed}`);
     $('#menu').hidden = true; $('#game').hidden = false;
-    $('#gMode').textContent = MODES[mode].name;
+    $('#gMode').innerHTML = `<span class="long">${MODES[mode].name}</span><span class="short">${MODES[mode].short}</span>`;
     $('#gLevel').textContent = LEVELS[level].label;
     $('#specName').textContent = P.specName;
     $('#boardId').textContent = `board ${seed}`;
     document.title = `FlowCyto · ${MODES[mode].name}`;
     $('#boardId').textContent = isDaily() ? `daily · ${today()}` : `board ${seed}`;
-    resumeTimer(); tickTimer();
+    resumeTimer(); tickTimer(); syncStatusBar();
     drawPlots(); drawPanel();
     const tk = tourKey();
     if (S.phase === 'play' && !prefs.tours[tk]) setTimeout(() => { if (S && S.seed === seed) startTour(tk); }, 350);
@@ -173,6 +182,7 @@
   const target = () => S.P.pops.find(p => p.label === S.P.target);
   const popTag = p => `${shapeIcon(p.slot)} <b>${p.label}</b>`;
   const freePeeks = () => S.level === 'easy';
+  const axisCaption = pl => pl.x === 'LC' ? 'kappa → · lambda ↑' : `${pl.x} → · ${pl.y} ↑`;
   const plotName = pl => pl.x === 'LC' ? 'kappa / lambda' : pl.x + ' / ' + pl.y;
 
   // ---------- Hard: the player's quad gates define the groups ----------
@@ -241,14 +251,17 @@
   const rowTag = r => `${shapeIcon(r.slot)} <b>${r.label}</b>`;
   const cloneRowObj = () => gating() ? rows().find(r => r.label === S.cloneRow) : { label: target().label, slot: target().slot, pop: target(), purity: 1 };
 
-  function plotOpts(i, size = 240) {
-    if (!gating()) return { size, focus: S.mode === 'clone' ? target().slot : S.focus };
+  /* Options for drawing plot i. Small tiles on phones draw compact (smaller viewBox, no axis text) so
+     clusters and badges stay legible; the enlarged view always draws full. */
+  function plotOpts(i, full) {
+    const compact = !full && !!S.compact, size = compact ? 160 : 240;
+    if (!gating()) return { size, compact, focus: S.mode === 'clone' ? target().slot : S.focus };
     const cr = S.mode === 'clone' ? cloneRowObj() : null;
     const labels = 'ABCDE'.split('').map((l, slot) => S.groups.some(g => g.slot === slot) ? l : null);
-    return { size, focus: S.mode === 'clone' ? (cr ? cr.slot : null) : S.focus, labels: 'none', paint: S.paint, paintLabels: labels, gate: S.gates[i] };
+    return { size, compact, focus: S.mode === 'clone' ? (cr ? cr.slot : null) : S.focus, labels: 'none', paint: S.paint, paintLabels: labels, gate: S.gates[i] };
   }
   function drawPlots() {
-    $('#plots').innerHTML = S.P.plots.map((pl, i) => `<figure data-plot="${i}" class="${S.flash === i ? 'flash' : ''}">${renderPlot(S.P, pl, plotOpts(i))}<figcaption>${plotName(pl)}</figcaption></figure>`).join('');
+    $('#plots').innerHTML = S.P.plots.map((pl, i) => `<figure data-plot="${i}" class="${S.flash === i ? 'flash' : ''}">${renderPlot(S.P, pl, plotOpts(i))}<figcaption>${S.compact ? axisCaption(pl) : plotName(pl)}</figcaption></figure>`).join('');
     fitPlots();
   }
 
@@ -264,6 +277,8 @@
       if (s > best.s) best = { s, c };
     }
     const s = Math.max(70, Math.min(330, Math.floor(best.s)));
+    const compact = s < 170;
+    if (compact !== !!S.compact) { S.compact = compact; return drawPlots(); }
     grid.style.setProperty('--plot', s + 'px');
     grid.style.gridTemplateColumns = `repeat(${best.c}, ${s + pad}px)`;
     grid.classList.toggle('tiny', s < 150);
@@ -367,6 +382,9 @@
     const chev = S.sheet === 'min' ? 'M4 10l4-4 4 4' : 'M4 6l4 4 4-4';
     el.innerHTML = `<div class="tabs" role="tablist">${tab('answer', 'Answer')}${tab('pad', freePeeks() ? 'Reference' : 'Scratch pad')}<button class="sheet-tg" data-sheet aria-label="${S.sheet === 'min' ? 'Show the panel' : 'Shrink the panel'}"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="${chev}" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div><div class="tabbody">${S.tab === 'pad' ? padHTML() : h}</div>`;
     el.classList.toggle('min', S.sheet === 'min');
+    // Grid cells as big as the panel allows (up to a comfortable finger size).
+    const grid = el.querySelector('.lgrid');
+    if (grid) grid.style.setProperty('--cell', Math.max(30, Math.min(46, Math.floor((el.clientWidth - 90) / S.P.pool.length))) + 'px');
     $('#hintBtn').disabled = !play;
     $('#undoBtn').disabled = !play || !S.undo.length;
     persist();
@@ -709,7 +727,7 @@
     zoomI = i; zoomAt = performance.now();
     const pl = S.P.plots[i], size = Math.floor(Math.min(innerWidth - 24, innerHeight - (gating() ? 130 : 90), 640));
     const tail = gating() ? `<div class="zoom-foot"><span>Drag anywhere to move the gate</span><button class="btn primary" data-done>Done</button></div>` : '';
-    zoom.innerHTML = `<figure data-zplot="${i}">${renderPlot(S.P, pl, plotOpts(i))}<figcaption>${plotName(pl)}${!gating() && prefs.enlarge === 'tap' ? ' · tap to close' : ''}</figcaption>${tail}</figure>`;
+    zoom.innerHTML = `<figure data-zplot="${i}">${renderPlot(S.P, pl, plotOpts(i, true))}<figcaption>${plotName(pl)}${!gating() && prefs.enlarge === 'tap' ? ' · tap to close' : ''}</figcaption>${tail}</figure>`;
     zoom.style.setProperty('--zoom', size + 'px');
     zoom.hidden = false;
   }
@@ -719,7 +737,7 @@
   function moveGate(d, ev) {
     const svg = d.zoom ? zoom.querySelector('svg') : document.querySelector(`#plots [data-plot="${d.i}"] svg`);
     if (!svg) return;
-    const rc = svg.getBoundingClientRect(), g = geom(S.P.plots[d.i]);
+    const rc = svg.getBoundingClientRect(), g = d.zoom ? geom(S.P.plots[d.i]) : geom(S.P.plots[d.i], S.compact ? 160 : 240, !!S.compact);
     const vx = (ev.clientX - rc.left) / rc.width * g.S, vy = (ev.clientY - rc.top) / rc.height * g.S;
     const gt = S.gates[d.i];
     if (gt.y1 != null) {
@@ -729,7 +747,7 @@
     } else { gt.x = g.dx(vx); gt.y = g.dy(vy); }
     if (!frame) frame = requestAnimationFrame(() => {
       frame = 0; regroup(); drawPlots();
-      if (zoomI != null) { const f = zoom.querySelector('figure'); if (f) f.firstElementChild.outerHTML = renderPlot(S.P, S.P.plots[zoomI], plotOpts(zoomI)); }
+      if (zoomI != null) { const f = zoom.querySelector('figure'); if (f) f.firstElementChild.outerHTML = renderPlot(S.P, S.P.plots[zoomI], plotOpts(zoomI, true)); }
       drawPanel();
     });
   }
