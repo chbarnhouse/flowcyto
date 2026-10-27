@@ -10,7 +10,7 @@
   const CUT = 1.2;
   const GEOM = { L: 36, B: 30, T: 8, R: 8 };
   // Compact (small plots on phones): the frame fills the tile and the caption names the axes.
-  const GEOM_COMPACT = { L: 5, B: 5, T: 5, R: 5 };
+  const GEOM_COMPACT = { L: 18, B: 17, T: 5, R: 5 }; // room for the axis names, not the ticks or signs
 
   function glyph(shape, x, y, s) {
     switch (shape) {
@@ -91,7 +91,10 @@
       }
     }
     // axes
-    if (!opts.compact) {
+    if (opts.compact) {
+      out.push(`<text x="${L + W / 2}" y="${S - 4}" class="dp-ax dp-axc" text-anchor="middle">${label(xm)} →</text>`);
+      out.push(`<text x="12" y="${T + H / 2}" class="dp-ax dp-axc" text-anchor="middle" transform="rotate(-90 12 ${T + H / 2})">${label(ym)} →</text>`);
+    } else {
     out.push(`<text x="${L + W / 2}" y="${S - 6}" class="dp-ax" text-anchor="middle">${label(xm)}</text>`);
     out.push(`<text x="12" y="${T + H / 2}" class="dp-ax" text-anchor="middle" transform="rotate(-90 12 ${T + H / 2})">${label(ym)}</text>`);
     if (!gated && !isScatter(xm)) out.push(`<text x="${(L + sx(CUT)) / 2}" y="${T + H + 12}" class="dp-q" text-anchor="middle">−</text><text x="${(sx(CUT) + L + W) / 2}" y="${T + H + 12}" class="dp-q" text-anchor="middle">+</text>`);

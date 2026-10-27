@@ -414,3 +414,41 @@ html.holdmode .plots figure { touch-action: pan-x; } /* the strip still swipes s
 .qopt.bad { border: 2px solid var(--nope); background: var(--nope-bg); }
 .qopt.bad .ic { color: var(--nope); border-color: var(--nope); }
 .qcard .verdict .ic { color: currentColor; }
+
+/* ---------- quiz type: one size for the cell and the marker; bigger throughout ---------- */
+.quiz .qkind { font-size: 15px; }
+.swipecard { gap: 12px; padding: 26px 22px; }
+.swipecard .qterm { font-size: clamp(30px, 9vw, 46px); line-height: 1.12; font-weight: 800; text-wrap: balance; }
+.swipecard .qcell { color: var(--ink); }
+.swipecard .qmark { color: var(--teal); }
+.swipecard .qand { font-size: 18px; }
+.swipecard .help, .qcard .help { font-size: 16px; }
+.qbig { font-size: clamp(30px, 8vw, 40px); line-height: 1.12; }
+.qopt { font-size: 17px; min-height: 54px; }
+.xout { width: 48px; }
+.qchip { font-size: 16px; min-height: 54px; }
+.qcard .sub { font-size: 16px; }
+.qrow { font-size: 16px; }
+.swipe-hint { font-size: 16px; }
+.yn .btn { font-size: 19px; min-height: 58px; }
+/* the verdict: a popup over the bottom, the question still readable above it */
+.qpop { position: fixed; inset: 0; z-index: 30; display: flex; align-items: flex-end; justify-content: center; background: rgba(10,12,16,.28); padding: 16px max(12px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px)); animation: qpop-in .18s ease-out; }
+.qpop-in { width: min(100%, 560px); padding: 18px 20px 16px; border-width: 4px; border-style: solid; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 18px 40px -12px rgba(10,12,16,.55); }
+.qpop.right .qpop-in { border-color: var(--yes); background: var(--yes-bg); }
+.qpop.wrong .qpop-in { border-color: var(--nope); border-style: dashed; background: var(--nope-bg); }
+.qpop-head { display: flex; align-items: center; gap: 10px; font-size: 26px; font-weight: 800; }
+.qpop-head .ic { width: 28px; height: 28px; }
+.qpop.right .qpop-head { color: var(--yes); }
+.qpop.wrong .qpop-head { color: var(--nope); }
+.qpop-line { margin: 0; font-size: 18px; color: var(--ink); }
+.qpop .help { margin: 0; font-size: 15px; color: var(--ink-2); }
+.qpop-next { margin-top: 6px; background: var(--card); justify-content: center; }
+@keyframes qpop-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .qpop { animation: none; } }
+/* the quiz's question picker inside Settings: full width under its label */
+.set-row.qset { flex-direction: column; align-items: stretch; }
+.set-row.qset .qchips, .set-row.qset .qrow { width: 100%; }
+#settings .qchip { font-size: var(--fs-sm); min-height: 46px; }
+.set-row.qset .qchips span, .set-row.qset .qrow span { display: inline; font-size: inherit; color: inherit; margin: 0; }
+.set-row.qset .qchips span.ic { display: inline-block; }
+.set-row.qset > div:first-child { flex: none; }

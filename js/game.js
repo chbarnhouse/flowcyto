@@ -232,7 +232,6 @@
   const refFilled = () => S.cfg.ref === 'filled';
   const choosing = () => !!S.cfg.choose;
   const nameOf = id => id === 'abn' ? 'Abnormal (clone)' : BY[id].name;
-  const axisCaption = pl => pl.x === 'LC' ? 'kappa → · lambda ↑' : `${pl.x} → · ${pl.y} ↑`;
   const plotName = pl => pl.x === 'LC' ? 'kappa / lambda' : pl.x + ' / ' + pl.y;
 
   // ---------- gated levels: the player's quad gates define the groups ----------
@@ -317,33 +316,66 @@
     return { size, compact, focus, labels: 'none', paint: S.paint, paintLabels: labels, gate: S.gates[i] || 'none' };
   }
   function drawPlots() {
-    $('#plots').innerHTML = S.P.plots.map((pl, i) => `<figure data-plot="${i}" class="${S.flash === i ? 'flash' : ''}">${renderPlot(S.P, pl, plotOpts(i))}<figcaption>${S.compact ? axisCaption(pl) : plotName(pl)}</figcaption></figure>`).join('');
+    $('#plots').innerHTML = S.P.plots.map((pl, i) => `<figure data-plot="${i}" class="${S.flash === i ? 'flash' : ''}">${renderPlot(S.P, pl, plotOpts(i))}${S.compact ? '' : `<figcaption>${plotName(pl)}</figcaption>`}</figure>`).join('');
     fitPlots();
   }
 
   /* Plots in a strip that scrolls sideways, one or two rows (Settings → Plot rows; two fill top to
-     bottom, so an odd count leaves the bottom-right empty). Plot size doesn't depend on how many there
-     are, so the answer panel below keeps the same height on every board. Phones: about 2¼ plots across
-     on one row, 2¾ on two (a part-plot at the edge says there's more). Desktop: the rows fill the
-     height beside the panel. */
+     bottom, so an odd count leaves the bottom-right empty). Desktop: the rows fill the height beside the
+     panel. Phones: the plots take the height the answer panel doesn't need. Starting from about 2¼
+     plots across (one row) or 2¾ (two), they grow while the panel still fits at full size, or shrink
+     (to 80%) if that lets it fit; if nothing fits, they stay at the start size and the panel scrolls.
+     Worked out once per board, step and screen size, so plots don't jump as you play. */
   const stacked = () => matchMedia('(max-width: 900px)').matches;
-  function fitPlots() {
-    const grid = $('#plots'); if (!S || !grid.clientWidth) return;
-    const n = S.P.plots.length, gap = parseFloat(getComputedStyle(grid).columnGap) || 8, pad = 10, cap = 16;
-    const R = Math.min(n, +prefs.plotRows === 1 ? 1 : 2), cols = Math.ceil(n / R), phone = stacked(), W = grid.clientWidth;
-    let s;
-    if (phone) s = (W + gap) / (R === 1 ? 2.25 : 2.75) - gap - pad;
-    else { grid.style.height = ''; s = (grid.clientHeight + gap) / R - gap - pad - cap; }
-    s = Math.max(64, Math.min(330, Math.floor(s)));
-    const compact = s < 170;
-    if (compact !== !!S.compact) { S.compact = compact; return drawPlots(); }
+  function layPlots(grid, s, R, W, gap, pad) {
+    const n = S.P.plots.length, cols = Math.ceil(n / R);
     grid.style.setProperty('--plot', s + 'px');
     Object.assign(grid.style, { gridTemplateColumns: '', gridTemplateRows: `repeat(${R}, auto)`, gridAutoFlow: 'column', gridAutoColumns: `${s + pad}px` });
     const fits = cols * (s + pad + gap) - gap <= W + 1;
     grid.style.justifyContent = fits ? 'center' : 'start';
     grid.classList.toggle('tiny', s < 150);
     grid.classList.toggle('strip', !fits);
+  }
+  // the panel's own height at a given fit, without messages (they come and go; the plots shouldn't)
+  function panelNeed(el, f) {
+    const keep = el.style.cssText;
+    el.style.flex = 'none'; el.style.height = 'auto';
+    el.style.setProperty('--fit', f); el.style.setProperty('--gs', (+prefs.gscale || 1) * f);
+    fitGrid(el.querySelector('.lgrid'), el.querySelector('.gridwrap'), f);
+    let h = el.offsetHeight;
+    for (const m of el.querySelectorAll('.msg')) h -= m.offsetHeight + parseFloat(getComputedStyle(m).marginTop) + parseFloat(getComputedStyle(m).marginBottom);
+    el.style.cssText = keep;
+    return h;
+  }
+  function fitPlots() {
+    const grid = $('#plots'); if (!S || !grid.clientWidth) return;
+    const n = S.P.plots.length, gap = parseFloat(getComputedStyle(grid).columnGap) || 8, pad = 10, cap = 16;
+    const R = Math.min(n, +prefs.plotRows === 1 ? 1 : 2), phone = stacked(), W = grid.clientWidth;
     $('.plots-col').classList.toggle('fit', phone);
+    let s;
+    if (!phone) { grid.style.height = ''; s = Math.max(64, Math.min(330, Math.floor((grid.clientHeight + gap) / R - gap - pad - cap))); }
+    else {
+      const sDef = Math.floor((W + gap) / (R === 1 ? 2.25 : 2.75) - gap - pad);
+      const key = [S.level, S.seed, S.phase, S.cols.length, R, W, innerHeight, prefs.gscale].join();
+      // only size against a panel drawn for this step (the plots draw first on a new board)
+      if (S.plotKey === key || S.panelDrawn !== S.phase) s = S.plotKey === key ? S.plotS : sDef;
+      else {
+        layPlots(grid, sDef, R, W, gap, pad);
+        const el = $('#panel'), have = el.offsetHeight;
+        // the plot size at which the panel gets exactly `need` px
+        const at = need => Math.floor(sDef + (have - need) / R);
+        const sLo = Math.max(72, Math.floor(sDef * 0.8)), sHi = Math.min(330, Math.floor((W + gap) / (R === 1 ? 1.6 : 2.1) - gap - pad));
+        const s1 = at(panelNeed(el, 1)), s76 = at(panelNeed(el, 0.76));
+        s = s1 >= sLo ? Math.min(s1, sHi) : s76 >= sLo ? sLo : sDef;
+        // small plots carry their axis names inside and drop the caption: account for that line
+        const capH = 13;
+        if ((s < 170) !== (sDef < 170)) s = Math.min(sHi, s + (s < 170 ? capH : -capH));
+        S.plotKey = key; S.plotS = s;
+      }
+    }
+    const compact = s < 170;
+    if (compact !== !!S.compact) { S.compact = compact; return drawPlots(); }
+    layPlots(grid, s, R, W, gap, pad);
   }
 
   // ---------- scratchpad columns (S.cols) and reference rows (S.refs) ----------
@@ -600,6 +632,7 @@
     if (S.phase === 'pct') h += `<div class="msg"><b>Last step.</b> The abnormal population is about what share of all events?<div class="pctq">${P.pct.options.map(v => `<button class="btn" data-pct="${v}">${v}%</button>`).join('')}</div></div>`;
     if (S.phase === 'done') h += recap();
     el.innerHTML = h;
+    S.panelDrawn = S.phase;
     fitPlots();
     fitHeight(el, el.querySelector('.lgrid'), el.querySelector('.gridwrap'));
     $('#hintBtn').disabled = !active();
@@ -1134,30 +1167,33 @@
   function openSettings() {
     const seg = (k, opts) => `<div class="seg" role="radiogroup">${opts.map(([v, t]) => `<button role="radio" data-pref="${k}" data-v="${v}" aria-checked="${String(prefs[k]) === String(v)}">${t}</button>`).join('')}</div>`;
     let h = `<div class="set-head"><h2 tabindex="-1" autofocus>Settings</h2><button class="iconbtn" data-close aria-label="Close settings">${ICON.close}</button></div>`;
-    const a = prefs.appearance;
-    h += `<div class="set-row"><div><b>Appearance</b><span>This device only.</span></div><div class="seg" role="radiogroup">${[['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark']].map(([v, t]) => `<button role="radio" data-theme-set="mode" data-v="${v}" aria-checked="${a.mode === v}">${t}</button>`).join('')}</div></div>`;
-    h += `<div class="set-row themes"><div><b>Light theme</b></div><div class="theme-row" role="radiogroup">${themeChoice('light', 'default', 'Default')}${themeChoice('light', 'light', 'Light')}</div></div>`;
-    h += `<div class="set-row themes"><div><b>Dark theme</b></div><div class="theme-row" role="radiogroup">${themeChoice('dark', 'dark', 'Dark')}${themeChoice('dark', 'black', 'Black')}</div></div>`;
-    const quiz = !$('#quiz').hidden;
+    // the mode's own settings first (the puzzles, or the Markers quiz), the app's at the bottom
+    const quiz = !$('#quiz').hidden, sec = t => `<h3 class="set-sec">${t}</h3>`;
     if (!quiz) {
-    h += `<div class="set-row"><div><b>Plot rows</b><span>Plots sit in a strip that scrolls sideways, in one row or two.</span></div>${seg('plotRows', [[1, 'One'], [2, 'Two']])}</div>`;
-    h += `<div class="set-row"><div><b>Grid size</b><span>Scratchpad, reference and diagnosis text and cells.</span></div>${seg('gscale', [[0.85, 'Small'], [1, 'Medium'], [1.2, 'Large'], [1.4, 'Larger']])}</div>`;
-    h += `<div class="set-row"><div><b>Enlarge a plot</b><span>Press and hold shows it while your finger is down; tap opens it until you tap again. On gated levels a tap always opens it, so you can place its gate.</span></div>${seg('enlarge', [['hold', 'Press and hold'], ['tap', 'Tap']])}</div>`;
-    h += `<div class="set-row"><div><b>Open the reference</b><span>For the read-only reference. When you fill it in yourself it always opens on a tap.</span></div>${seg('refOpen', [['hold', 'Press and hold'], ['tap', 'Tap']])}</div>`;
-    h += `<div class="set-row"><div><b>Timer</b><span>Shows the clock while you play and your best time per level. Times are kept either way.</span></div>${seg('timer', [[false, 'Off'], [true, 'On']])}</div>`;
-    h += `<div class="set-row"><div><b>Auto-check</b><span>Marks each choice right or wrong as you make it. A wrong choice counts as a mistake.</span></div>${seg('autoCheck', [[false, 'Off'], [true, 'On']])}</div>`;
-    }
-    if (!S) {
-      if (!quiz) h += '<h3 class="set-sec">Markers quiz</h3>';
-      const secs = [[0, 'Off'], [1, '1 s'], [2, '2 s'], [3, '3 s'], [5, '5 s']];
-      h += `<div class="set-row"><div><b>Next question after a right answer</b><span>Off: wait for Next.</span></div>${seg('quizRight', secs)}</div>`;
-      h += `<div class="set-row"><div><b>Next question after a wrong answer</b><span>Off: wait for Next, so you can read the correction.</span></div>${seg('quizWrong', secs)}</div>`;
+      if (!S) h += sec('Puzzles');
+      h += `<div class="set-row"><div><b>Plot rows</b><span>Plots sit in a strip that scrolls sideways, in one row or two.</span></div>${seg('plotRows', [[1, 'One'], [2, 'Two']])}</div>`;
+      h += `<div class="set-row"><div><b>Grid size</b><span>Scratchpad, reference and diagnosis text and cells.</span></div>${seg('gscale', [[0.85, 'Small'], [1, 'Medium'], [1.2, 'Large'], [1.4, 'Larger']])}</div>`;
+      h += `<div class="set-row"><div><b>Enlarge a plot</b><span>Press and hold shows it while your finger is down; tap opens it until you tap again. On gated levels a tap always opens it, so you can place its gate.</span></div>${seg('enlarge', [['hold', 'Press and hold'], ['tap', 'Tap']])}</div>`;
+      h += `<div class="set-row"><div><b>Open the reference</b><span>For the read-only reference. When you fill it in yourself it always opens on a tap.</span></div>${seg('refOpen', [['hold', 'Press and hold'], ['tap', 'Tap']])}</div>`;
+      h += `<div class="set-row"><div><b>Timer</b><span>Shows the clock while you play and your best time per level. Times are kept either way.</span></div>${seg('timer', [[false, 'Off'], [true, 'On']])}</div>`;
+      h += `<div class="set-row"><div><b>Auto-check</b><span>Marks each choice right or wrong as you make it. A wrong choice counts as a mistake.</span></div>${seg('autoCheck', [[false, 'Off'], [true, 'On']])}</div>`;
     }
     if (S) {
       const left = S.refs.filter(id => !S.peeks.has(id)).length;
       h += `<div class="set-row"><div><b>How to play</b><span>A short walk-through on this board.</span></div><button class="btn" data-tour>Show me</button></div>`;
       if (!refFilled()) h += `<div class="set-row"><div><b>Reference</b><span>${left ? `Fill it in from the key. Counts as ${plural(left, 'peek')}.` : 'Already filled in.'}</span></div><button class="btn" data-fill ${left ? '' : 'disabled'}>Fill in from the key</button></div>`;
+    } else {
+      h += sec('Markers quiz');
+      h += `<div class="set-row qset"><div><b>Questions</b><span>At least one kind stays on.</span></div>${FC.markers.modeHTML()}</div>`;
+      const secs = [[0, 'Off'], [1, '1 s'], [2, '2 s'], [3, '3 s'], [5, '5 s']];
+      h += `<div class="set-row"><div><b>Next question after a right answer</b><span>Off: wait for Next.</span></div>${seg('quizRight', secs)}</div>`;
+      h += `<div class="set-row"><div><b>Next question after a wrong answer</b><span>Off: wait for Next, so you can read the correction.</span></div>${seg('quizWrong', secs)}</div>`;
     }
+    h += sec('App');
+    const a = prefs.appearance;
+    h += `<div class="set-row"><div><b>Appearance</b><span>This device only.</span></div><div class="seg" role="radiogroup">${[['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark']].map(([v, t]) => `<button role="radio" data-theme-set="mode" data-v="${v}" aria-checked="${a.mode === v}">${t}</button>`).join('')}</div></div>`;
+    h += `<div class="set-row themes"><div><b>Light theme</b></div><div class="theme-row" role="radiogroup">${themeChoice('light', 'default', 'Default')}${themeChoice('light', 'light', 'Light')}</div></div>`;
+    h += `<div class="set-row themes"><div><b>Dark theme</b></div><div class="theme-row" role="radiogroup">${themeChoice('dark', 'dark', 'Dark')}${themeChoice('dark', 'black', 'Black')}</div></div>`;
     dlg.innerHTML = h;
     if (!dlg.open) dlg.showModal();
   }

@@ -72,6 +72,7 @@ h1, h2, h3 { margin: 0; line-height: 1.2; }
 .dp-gray { fill: var(--slate); opacity: .45; stroke: none; }
 .dp-ax { font: 600 12px var(--display); fill: var(--ink-2); }
 .dp-q { font: 700 12px var(--display); fill: var(--muted); }
+.dp-axc { font-size: 13px; font-weight: 700; }
 .dp-badge circle { fill: var(--card); stroke-width: 2.4; }
 .dp-badge text { font: 800 12px var(--display); fill: var(--ink); }
 .dp-badge.dp-dim { opacity: .3; }

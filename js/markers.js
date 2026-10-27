@@ -88,15 +88,18 @@
     setup();
   }
   function close() { $('#quiz').hidden = true; }
-  const bar = () => `<header class="bar"><div class="bar-in"><button class="iconbtn" data-qmenu aria-label="Main menu">${ICON.back}<span>Menu</span></button><div class="gtitle"><b>Markers</b><span>${Q.answered ? `${Q.score} of ${Q.answered} · streak ${Q.streak} · best ${best()}` : `best streak ${best()}`}</span></div><button class="iconbtn" data-qsetup aria-label="Question types">${ICON.list}<span>Questions</span></button><button class="iconbtn" data-qsettings aria-label="Settings">${ICON.gear}<span>Settings</span></button></div></header>`;
-  function setup() {
+  const bar = () => `<header class="bar"><div class="bar-in"><button class="iconbtn" data-qmenu aria-label="Main menu">${ICON.back}<span>Menu</span></button><div class="gtitle"><b>Markers</b><span>${Q.answered ? `${Q.score} of ${Q.answered} · streak ${Q.streak} · best ${best()}` : `best streak ${best()}`}</span></div><button class="iconbtn" data-qsettings aria-label="Settings">${ICON.gear}<span>Settings</span></button></div></header>`;
+  // the quiz's own settings: shown on the start screen and at the top of Settings
+  function modeHTML() {
     const c = Q.cfg, chip = (k, label) => `<button class="qchip" data-qkind="${k}" aria-pressed="${!!c.kinds[k]}">${c.kinds[k] ? ICON.yes : '<span class="ic"></span>'}<span>${label}</span></button>`;
     const seg = `<div class="seg" role="radiogroup">${[['normal', 'Normal cells'], ['neoplasm', 'Neoplasms'], ['both', 'Both']].map(([v, t]) => `<button role="radio" data-qcells="${v}" aria-checked="${c.cells === v}">${t}</button>`).join('')}</div>`;
-    const any = Object.values(c.kinds).some(Boolean);
-    $('#quiz').innerHTML = bar() + `<main class="qmain"><section class="qcard setup card"><h2>Markers</h2><p class="sub">An endless quiz on which cells carry which markers. Pick the kinds of question; switch them any time with Questions.</p>
-      <div class="qchips">${chip('match', 'Does this cell carry this marker? Swipe right for yes, left for no')}${chip('cells', 'A marker: pick every cell that carries it')}${chip('markers', 'A cell: pick every marker it carries')}</div>
-      <div class="qrow"><b>Cells</b>${seg}</div>
-      <button class="btn primary big" data-qstart ${any ? '' : 'disabled'}>Start</button>${any ? '' : '<p class="help">Pick at least one kind of question.</p>'}</section></main>`;
+    return `<div class="qchips">${chip('match', 'Does this cell carry this marker? Swipe right for yes, left for no')}${chip('cells', 'A marker: pick every cell that carries it')}${chip('markers', 'A cell: pick every marker it carries')}</div>
+      <div class="qrow"><b>Cells</b>${seg}</div>`;
+  }
+  function setup() {
+    Q.q = null;
+    $('#quiz').innerHTML = bar() + `<main class="qmain"><section class="qcard setup card"><h2>Markers</h2><p class="sub">An endless quiz on which cells carry which markers. Pick the kinds of question; change them any time in Settings.</p>
+      ${modeHTML()}<button class="btn primary big" data-qstart>Start</button></section></main>`;
   }
   function next() {
     Q.q = makeQuestion(); Q.picked = new Set(); Q.crossed = new Set(); Q.done = false; Q.right = null;
@@ -108,8 +111,7 @@
     if (q.kind === 'match') {
       const e = BY[q.id];
       let h = `<div class="swipe-wrap"><div class="swipe-hint left">${ICON.no}<span>No</span></div><div class="swipe-hint right">${ICON.yes}<span>Yes</span></div>
-        <div class="swipecard card ${fb ? (Q.right ? 'right' : 'wrong') : ''}" id="swipecard"><span class="qkind">Does it carry it?</span><b class="qcell">${esc(e.name)}</b><span class="qand">and</span><b class="qmark">${esc(mk.name)}</b>
-        ${fb ? `<p class="verdict">${Q.right ? ICON.yes + ' Right' : ICON.no + ' Not quite'}: ${esc(e.name)} is <b>${q.answer ? mk.name + '+' : mk.name + '−'}</b></p>${mk.note ? `<p class="help">${esc(mk.name)}: ${esc(mk.note)}</p>` : ''}` : '<p class="help">Swipe right for yes, left for no.</p>'}</div></div>`;
+        <div class="swipecard card" id="swipecard"><span class="qkind">Does it carry it?</span><b class="qterm qcell">${esc(e.name)}</b><span class="qand">and</span><b class="qterm qmark">${esc(mk.name)}</b><p class="help">Swipe right for yes, left for no.</p></div></div>`;
       if (!fb) h += `<div class="yn"><button class="btn big no" data-yn="no">${ICON.no}<span>No</span></button><button class="btn big yes" data-yn="yes">${ICON.yes}<span>Yes</span></button></div>`;
       return h;
     }
@@ -124,12 +126,22 @@
       h += `<div class="qrow-opt"><button class="qopt ${cls}" data-qopt="${o}" ${fb ? 'disabled' : ''}>${mark}<span>${nm}</span>${tail}</button>${fb ? '' : `<button class="xout" data-qx="${o}" aria-pressed="${x}" aria-label="${x ? 'Restore' : 'Cross out'} ${nm}" title="${x ? 'Restore' : 'Cross out'}">${ICON.no}</button>`}</div>`;
     }
     h += '</div>';
-    if (fb) h += `<p class="verdict">${Q.right ? ICON.yes + ' All right.' : ICON.no + ' Not quite.'} ${isCells ? '' : esc(BY[q.id].teach)}</p>`;
-    else h += `<button class="btn primary big" data-qcheck ${Q.picked.size ? '' : 'disabled'}>Check</button>`;
+    if (!fb) h += `<button class="btn primary big" data-qcheck ${Q.picked.size ? '' : 'disabled'}>Check</button>`;
     return h + '</section>';
   }
+  // the verdict pops up over the bottom of the screen; the question stays visible above it
+  function popupHTML() {
+    const q = Q.q, mk = q.mk && MARKERS[q.mk];
+    let body;
+    if (q.kind === 'match') body = `<p class="qpop-line">${esc(BY[q.id].name)} is <b>${esc(mk.name)}${q.answer ? '+' : '−'}</b></p>${mk.note ? `<p class="help">${esc(mk.name)}: ${esc(mk.note)}</p>` : ''}`;
+    else {
+      const names = q.correct.map(o => esc(q.kind === 'cells' ? BY[o].name : MARKERS[o].name)).join(', ');
+      body = `<p class="qpop-line">${q.kind === 'cells' ? `Carry ${esc(mk.name)}` : `${esc(BY[q.id].name)} carries`}: <b>${names}</b></p>${q.kind === 'markers' && BY[q.id].teach ? `<p class="help">${esc(BY[q.id].teach)}</p>` : ''}`;
+    }
+    return `<div class="qpop ${Q.right ? 'right' : 'wrong'}" role="status"><div class="qpop-in card"><div class="qpop-head">${Q.right ? ICON.yes : ICON.no}<b>${Q.right ? 'Right' : 'Not quite'}</b></div>${body}<button class="btn big qpop-next" data-qnext>Next</button></div></div>`;
+  }
   function draw() {
-    $('#quiz').innerHTML = bar() + `<main class="qmain">${questionHTML()}${Q.done ? '<button class="btn primary big" data-qnext>Next</button>' : ''}</main>`;
+    $('#quiz').innerHTML = bar() + `<main class="qmain">${questionHTML()}</main>${Q.done ? popupHTML() : ''}`;
     if (Q.q.kind === 'match' && !Q.done) bindSwipe();
   }
   function answer(right) {
@@ -164,12 +176,19 @@
 
   // ---------- input ----------
   document.addEventListener('click', ev => {
+    const inSettings = ev.target.closest('#settings');
+    const k = ev.target.closest('[data-qkind]'), c = ev.target.closest('[data-qcells]');
+    if (k || c) {
+      if (k) { const kinds = Q.cfg.kinds, key = k.dataset.qkind; if (kinds[key] && Object.values(kinds).filter(Boolean).length === 1) return; kinds[key] = !kinds[key]; }
+      else Q.cfg.cells = c.dataset.qcells;
+      save('flowcyto.markers', Q.cfg);
+      if (!$('#quiz').hidden && !Q.q) setup();
+      if (inSettings) FC.openSettings();
+      return;
+    }
     if (!ev.target.closest('#quiz')) return;
     if (ev.target.closest('[data-qmenu]')) { location.hash = '/'; return; }
-    if (ev.target.closest('[data-qsetup]')) return setup();
     if (ev.target.closest('[data-qsettings]')) return FC.openSettings();
-    const k = ev.target.closest('[data-qkind]'); if (k) { Q.cfg.kinds[k.dataset.qkind] = !Q.cfg.kinds[k.dataset.qkind]; save('flowcyto.markers', Q.cfg); return setup(); }
-    const c = ev.target.closest('[data-qcells]'); if (c) { Q.cfg.cells = c.dataset.qcells; save('flowcyto.markers', Q.cfg); return setup(); }
     if (ev.target.closest('[data-qstart]')) return next();
     if (ev.target.closest('[data-qnext]')) return next();
     const yn = ev.target.closest('[data-yn]'); if (yn && !Q.done) return answer((yn.dataset.yn === 'yes') === Q.q.answer);
@@ -183,5 +202,5 @@
     else if (Q.done && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); next(); }
   });
 
-  FC.markers = { open, close, makeQuestion: () => makeQuestion(), cfg: Q.cfg };
+  FC.markers = { open, close, modeHTML, makeQuestion: () => makeQuestion(), cfg: Q.cfg };
 })();
