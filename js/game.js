@@ -41,7 +41,7 @@
   // ---------- storage (every access guarded: private windows may refuse) ----------
   const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || 'null') || d; } catch (e) { return d; } };
   const save = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* stats/prefs just don't persist */ } };
-  const prefs = Object.assign({ enlarge: 'hold', refOpen: 'hold', gscale: 1, autoCheck: false, timer: false, tours: {},
+  const prefs = Object.assign({ enlarge: 'hold', refOpen: 'hold', gscale: 1, plotRows: 2, quizRight: 3, quizWrong: 0, autoCheck: false, timer: false, tours: {},
     custom: { pops: 4, gating: false, choose: false, decoys: true, extra: true, ref: 'filled', spread: 'normal', pct: false, scratch: true, dx: 'choice' } }, load('flowcyto.prefs', {}));
   prefs.appearance = Object.assign({ mode: 'auto', light: 'default', dark: 'dark' }, prefs.appearance || {});
   prefs.custom = Object.assign({ scratch: true, dx: 'choice' }, prefs.custom);
@@ -321,43 +321,29 @@
     fitPlots();
   }
 
-  /* Plots in a fixed arrangement: 1–3 in one row, 4 as 2×2, 5 as 3+2, 6 as 3×3, 7+ three to a row
-     scrolling with 2¼ rows showing. A short last row is centered (the grid has two tracks per plot, so
-     a pair can sit half a plot in). On phones the plots take only the height they need, up to 56% of
-     the board, and the answer panel below gets the rest. */
+  /* Plots in a strip that scrolls sideways, one or two rows (Settings → Plot rows; two fill top to
+     bottom, so an odd count leaves the bottom-right empty). Plot size doesn't depend on how many there
+     are, so the answer panel below keeps the same height on every board. Phones: about 2¼ plots across
+     on one row, 2¾ on two (a part-plot at the edge says there's more). Desktop: the rows fill the
+     height beside the panel. */
   const stacked = () => matchMedia('(max-width: 900px)').matches;
   function fitPlots() {
     const grid = $('#plots'); if (!S || !grid.clientWidth) return;
-    const n = S.P.plots.length, cs = getComputedStyle(grid), gap = parseFloat(cs.columnGap) || 8, pad = 10, cap = 16;
-    const cols = n <= 3 ? n : n === 4 ? 2 : 3, rows = Math.ceil(n / cols), vis = n > 6 ? 2.25 : rows;
-    const col = $('.plots-col'), phone = stacked();
-    let H;
-    if (phone) {
-      const board = $('.board'), bs = getComputedStyle(board);
-      const inner = board.clientHeight - parseFloat(bs.paddingTop) - parseFloat(bs.paddingBottom) - parseFloat(bs.rowGap || 0);
-      const head = $('.board-head'), hh = head.offsetHeight ? head.offsetHeight + parseFloat(getComputedStyle(head).marginBottom) : 0;
-      H = inner * 0.56 - hh;
-    } else { grid.style.height = ''; H = grid.clientHeight; }
-    const sW = (grid.clientWidth - gap * (cols - 1)) / cols - pad;
-    const sH = (H + gap) / vis - gap - pad - cap;
-    const s = Math.max(64, Math.min(330, Math.floor(Math.min(sW, sH))));
+    const n = S.P.plots.length, gap = parseFloat(getComputedStyle(grid).columnGap) || 8, pad = 10, cap = 16;
+    const R = Math.min(n, +prefs.plotRows === 1 ? 1 : 2), cols = Math.ceil(n / R), phone = stacked(), W = grid.clientWidth;
+    let s;
+    if (phone) s = (W + gap) / (R === 1 ? 2.25 : 2.75) - gap - pad;
+    else { grid.style.height = ''; s = (grid.clientHeight + gap) / R - gap - pad - cap; }
+    s = Math.max(64, Math.min(330, Math.floor(s)));
     const compact = s < 170;
     if (compact !== !!S.compact) { S.compact = compact; return drawPlots(); }
     grid.style.setProperty('--plot', s + 'px');
-    grid.style.gridTemplateColumns = `repeat(${cols * 2}, ${(s + pad - gap) / 2}px)`;
-    const last = n - (rows - 1) * cols;
-    [...grid.children].forEach((f, i) => {
-      const r = Math.floor(i / cols), k = i % cols, off = r === rows - 1 ? cols - last : 0;
-      f.style.gridColumn = `${off + 2 * k + 1} / span 2`;
-    });
+    Object.assign(grid.style, { gridTemplateColumns: '', gridTemplateRows: `repeat(${R}, auto)`, gridAutoFlow: 'column', gridAutoColumns: `${s + pad}px` });
+    const fits = cols * (s + pad + gap) - gap <= W + 1;
+    grid.style.justifyContent = fits ? 'center' : 'start';
     grid.classList.toggle('tiny', s < 150);
-    grid.classList.toggle('scroll', n > 6);
-    if (phone) {
-      // the figure's real height (border, padding, caption) rather than the estimate
-      const fh = grid.firstElementChild ? grid.firstElementChild.offsetHeight : s + pad + cap;
-      grid.style.height = Math.ceil(vis * (fh + gap) - gap) + 'px';
-    }
-    col.classList.toggle('fit', phone);
+    grid.classList.toggle('strip', !fits);
+    $('.plots-col').classList.toggle('fit', phone);
   }
 
   // ---------- scratchpad columns (S.cols) and reference rows (S.refs) ----------
@@ -454,7 +440,7 @@
   function drawRef() {
     refPane.innerHTML = `<div class="refpane-in card">${refHTML()}</div>`;
     refPane.classList.toggle('held', refHeld);
-    fitGrid(refPane.querySelector('.pad'), refPane.querySelector('.gridwrap'));
+    fitHeight(refPane.querySelector('.refpane-in'), refPane.querySelector('.pad'), refPane.querySelector('.gridwrap'));
     // a held sheet can't be scrolled (the finger is on the button): grow it upward until it all fits,
     // never past the top bar
     const inn = refPane.querySelector('.refpane-in'), over = inn.scrollHeight - inn.clientHeight;
@@ -516,9 +502,23 @@
   /* Grid sizing: cells as big as the space allows (scratchpad cells up to finger size; reference cells
      smaller, since the read-only ones aren't touched), scaled by Settings → Grid size. A grid that fits
      is centered; one that doesn't scrolls sideways with its name column pinned. */
-  function fitGrid(table, wrap) {
+  /* Fit a panel or the reference to its height: shrink the grid and the choices in steps (down to 76%);
+     if even that won't fit, go back to full size and let it scroll, since height no longer limits it. */
+  function fitHeight(box, table, wrap) {
+    if (!box) return;
+    const fits = () => box.scrollHeight <= box.clientHeight + 1;
+    const apply = f => { box.style.setProperty('--fit', f); box.style.setProperty('--gs', (+prefs.gscale || 1) * f); fitGrid(table, wrap, f); };
+    apply(1);
+    if (fits()) return;
+    for (const f of [0.92, 0.84, 0.76]) { apply(f); if (fits()) return; }
+    apply(1);
+  }
+  // the panel's height settles after the plots lay out (and changes on rotation): fit again when it does
+  let panelH = 0;
+  new ResizeObserver(() => { const el = $('#panel'); if (!S || el.clientHeight === panelH) return; panelH = el.clientHeight; fitHeight(el, el.querySelector('.lgrid'), el.querySelector('.gridwrap')); }).observe($('#panel'));
+  function fitGrid(table, wrap, fit = 1) {
     if (!table || !wrap) return;
-    const gs = +prefs.gscale || 1, n = table.querySelector('tr').children.length - 1;
+    const gs = (+prefs.gscale || 1) * fit, n = table.querySelector('tr').children.length - 1;
     const head = table.classList.contains('lgrid') ? 64 : 116, avail = wrap.clientWidth - head * gs;
     const answer = table.classList.contains('lgrid');
     // A few scratchpad columns get wide cells with their names written across (no tall sideways labels).
@@ -527,7 +527,7 @@
     const cell = Math.max(lo * gs, Math.min(hi * gs, Math.floor(avail / Math.max(1, n))));
     table.classList.toggle('flat', flat);
     table.style.setProperty('--cell', cell + 'px');
-    table.style.setProperty('--row', (flat ? Math.min(46, cell * 0.62) : cell) + 'px');
+    table.style.setProperty('--row', (flat ? Math.min(46 * gs, cell * 0.62) : cell) + 'px');
     wrap.classList.toggle('scrolls', table.scrollWidth > wrap.clientWidth + 1);
   }
 
@@ -600,11 +600,11 @@
     if (S.phase === 'pct') h += `<div class="msg"><b>Last step.</b> The abnormal population is about what share of all events?<div class="pctq">${P.pct.options.map(v => `<button class="btn" data-pct="${v}">${v}%</button>`).join('')}</div></div>`;
     if (S.phase === 'done') h += recap();
     el.innerHTML = h;
-    fitGrid(el.querySelector('.lgrid'), el.querySelector('.gridwrap'));
+    fitPlots();
+    fitHeight(el, el.querySelector('.lgrid'), el.querySelector('.gridwrap'));
     $('#hintBtn').disabled = !active();
     $('#undoBtn').disabled = !active() || !S.undo.length;
     persist();
-    fitPlots();
   }
 
   // ---------- checking ----------
@@ -1091,18 +1091,23 @@
   }
   $('#plots').addEventListener('pointerdown', ev => {
     const f = ev.target.closest('[data-plot]'); if (!f || !S) return;
-    if (gating()) { drag = { i: +f.dataset.plot, x0: ev.clientX, y0: ev.clientY, moved: false }; $('#plots').setPointerCapture(ev.pointerId); return; }
+    // gated: a mouse drags gates in place; a finger swipes the strip, and a tap opens the plot to drag in
+    if (gating()) { drag = { i: +f.dataset.plot, x0: ev.clientX, y0: ev.clientY, moved: false, touch: ev.pointerType === 'touch' }; if (!drag.touch) $('#plots').setPointerCapture(ev.pointerId); return; }
     if (prefs.enlarge !== 'hold') return;
     held = false;
     holdTimer = setTimeout(() => { held = true; openZoom(+f.dataset.plot); startHold('plot'); }, 220);
   });
   $('#plots').addEventListener('pointermove', ev => {
     if (!drag || drag.zoom || !gatesLive()) return;
+    if (drag.touch) { if (Math.hypot(ev.clientX - drag.x0, ev.clientY - drag.y0) > 10) drag.moved = true; return; }
     if (!drag.moved && Math.hypot(ev.clientX - drag.x0, ev.clientY - drag.y0) < 6) return;
     if (!drag.moved) pushUndo();
     drag.moved = true; moveGate(drag, ev);
   });
   $('#plots').addEventListener('pointerup', () => { if (!drag || drag.zoom) return; const d = drag; drag = null; if (!d.moved) openZoom(d.i); });
+  $('#plots').addEventListener('pointercancel', () => { if (drag && !drag.zoom) drag = null; });
+  // once a plot or the reference is held open, the finger slides to the latch: don't let it scroll the strip
+  document.addEventListener('touchmove', ev => { if (held || holdKind) ev.preventDefault(); }, { passive: false });
   zoom.addEventListener('pointerdown', ev => {
     if (!gatesLive() || zoomI == null || !ev.target.closest('svg')) return;
     pushUndo(); drag = { i: zoomI, zoom: true, moved: true }; zoom.setPointerCapture(ev.pointerId); moveGate(drag, ev);
@@ -1128,16 +1133,26 @@
   const dlg = $('#settings');
   function openSettings() {
     const seg = (k, opts) => `<div class="seg" role="radiogroup">${opts.map(([v, t]) => `<button role="radio" data-pref="${k}" data-v="${v}" aria-checked="${String(prefs[k]) === String(v)}">${t}</button>`).join('')}</div>`;
-    let h = `<div class="set-head"><h2>Settings</h2><button class="iconbtn" data-close aria-label="Close settings">${ICON.close}</button></div>`;
+    let h = `<div class="set-head"><h2 tabindex="-1" autofocus>Settings</h2><button class="iconbtn" data-close aria-label="Close settings">${ICON.close}</button></div>`;
     const a = prefs.appearance;
     h += `<div class="set-row"><div><b>Appearance</b><span>This device only.</span></div><div class="seg" role="radiogroup">${[['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark']].map(([v, t]) => `<button role="radio" data-theme-set="mode" data-v="${v}" aria-checked="${a.mode === v}">${t}</button>`).join('')}</div></div>`;
     h += `<div class="set-row themes"><div><b>Light theme</b></div><div class="theme-row" role="radiogroup">${themeChoice('light', 'default', 'Default')}${themeChoice('light', 'light', 'Light')}</div></div>`;
     h += `<div class="set-row themes"><div><b>Dark theme</b></div><div class="theme-row" role="radiogroup">${themeChoice('dark', 'dark', 'Dark')}${themeChoice('dark', 'black', 'Black')}</div></div>`;
+    const quiz = !$('#quiz').hidden;
+    if (!quiz) {
+    h += `<div class="set-row"><div><b>Plot rows</b><span>Plots sit in a strip that scrolls sideways, in one row or two.</span></div>${seg('plotRows', [[1, 'One'], [2, 'Two']])}</div>`;
     h += `<div class="set-row"><div><b>Grid size</b><span>Scratchpad, reference and diagnosis text and cells.</span></div>${seg('gscale', [[0.85, 'Small'], [1, 'Medium'], [1.2, 'Large'], [1.4, 'Larger']])}</div>`;
     h += `<div class="set-row"><div><b>Enlarge a plot</b><span>Press and hold shows it while your finger is down; tap opens it until you tap again. On gated levels a tap always opens it, so you can place its gate.</span></div>${seg('enlarge', [['hold', 'Press and hold'], ['tap', 'Tap']])}</div>`;
     h += `<div class="set-row"><div><b>Open the reference</b><span>For the read-only reference. When you fill it in yourself it always opens on a tap.</span></div>${seg('refOpen', [['hold', 'Press and hold'], ['tap', 'Tap']])}</div>`;
     h += `<div class="set-row"><div><b>Timer</b><span>Shows the clock while you play and your best time per level. Times are kept either way.</span></div>${seg('timer', [[false, 'Off'], [true, 'On']])}</div>`;
     h += `<div class="set-row"><div><b>Auto-check</b><span>Marks each choice right or wrong as you make it. A wrong choice counts as a mistake.</span></div>${seg('autoCheck', [[false, 'Off'], [true, 'On']])}</div>`;
+    }
+    if (!S) {
+      if (!quiz) h += '<h3 class="set-sec">Markers quiz</h3>';
+      const secs = [[0, 'Off'], [1, '1 s'], [2, '2 s'], [3, '3 s'], [5, '5 s']];
+      h += `<div class="set-row"><div><b>Next question after a right answer</b><span>Off: wait for Next.</span></div>${seg('quizRight', secs)}</div>`;
+      h += `<div class="set-row"><div><b>Next question after a wrong answer</b><span>Off: wait for Next, so you can read the correction.</span></div>${seg('quizWrong', secs)}</div>`;
+    }
     if (S) {
       const left = S.refs.filter(id => !S.peeks.has(id)).length;
       h += `<div class="set-row"><div><b>How to play</b><span>A short walk-through on this board.</span></div><button class="btn" data-tour>Show me</button></div>`;
@@ -1157,9 +1172,9 @@
     const b = ev.target.closest('[data-pref]');
     if (b) {
       const k = b.dataset.pref, raw = b.dataset.v;
-      const v = (k === 'autoCheck' || k === 'timer') ? raw === 'true' : k === 'gscale' ? +raw : raw;
+      const v = (k === 'autoCheck' || k === 'timer') ? raw === 'true' : ['gscale', 'plotRows', 'quizRight', 'quizWrong'].includes(k) ? +raw : raw;
       setPref(k, v); applyTheme();
-      if (S) { drawPanel(); tickTimer(); if (refIsOpen()) drawRef(); } else showMenu();
+      if (S) { drawPanel(); tickTimer(); if (refIsOpen()) drawRef(); } else if ($('#quiz').hidden) showMenu();
       return openSettings();
     }
     if (ev.target.closest('[data-fill]')) { dlg.close(); fillReference(); }
@@ -1171,7 +1186,7 @@
   $('#hintBtn').addEventListener('click', hint);
   $('#undoBtn').addEventListener('click', undo);
   $('#setBtn').addEventListener('click', openSettings);
-  addEventListener('resize', () => { if (!S) return; fitPlots(); fitGrid($('#panel .lgrid'), $('#panel .gridwrap')); if (refIsOpen()) { placeRef(); drawRef(); } });
+  addEventListener('resize', () => { if (!S) return; fitPlots(); fitHeight($('#panel'), $('#panel .lgrid'), $('#panel .gridwrap')); if (refIsOpen()) { placeRef(); drawRef(); } });
   addEventListener('hashchange', route);
 
   // ---------- guided first board: coach marks over the real board, once per kind (Settings → How to play) ----------
@@ -1244,6 +1259,7 @@
   addEventListener('resize', () => { if (tour) showTourStep(); });
 
   FC.state = () => S; // for tests and the console
+  FC.prefs = prefs; FC.openSettings = openSettings; // the Markers quiz shares them
   applyTheme();
   route();
 })();

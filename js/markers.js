@@ -19,6 +19,7 @@
     no: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>',
     back: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3L5 8l5 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     close: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
+    list: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5l1.2 1.2 2-2.4M2.5 10.5l1.2 1.2 2-2.4M8 5h5.5M8 11h5.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     gear: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h6M12 4.5h1.5M2.5 11.5h1.5M7.5 11.5h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="10.2" cy="4.5" r="1.7" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="5.8" cy="11.5" r="1.7" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>',
   };
   const KINDS = { match: 'Does it carry it? (swipe)', cells: 'Marker → which cells', markers: 'Cell → which markers' };
@@ -87,7 +88,7 @@
     setup();
   }
   function close() { $('#quiz').hidden = true; }
-  const bar = () => `<header class="bar"><div class="bar-in"><button class="iconbtn" data-qmenu aria-label="Main menu">${ICON.back}<span>Menu</span></button><div class="gtitle"><b>Markers</b><span>${Q.answered ? `${Q.score} of ${Q.answered} · streak ${Q.streak} · best ${best()}` : `best streak ${best()}`}</span></div><button class="iconbtn" data-qsetup aria-label="Question types">${ICON.gear}<span>Questions</span></button></div></header>`;
+  const bar = () => `<header class="bar"><div class="bar-in"><button class="iconbtn" data-qmenu aria-label="Main menu">${ICON.back}<span>Menu</span></button><div class="gtitle"><b>Markers</b><span>${Q.answered ? `${Q.score} of ${Q.answered} · streak ${Q.streak} · best ${best()}` : `best streak ${best()}`}</span></div><button class="iconbtn" data-qsetup aria-label="Question types">${ICON.list}<span>Questions</span></button><button class="iconbtn" data-qsettings aria-label="Settings">${ICON.gear}<span>Settings</span></button></div></header>`;
   function setup() {
     const c = Q.cfg, chip = (k, label) => `<button class="qchip" data-qkind="${k}" aria-pressed="${!!c.kinds[k]}">${c.kinds[k] ? ICON.yes : '<span class="ic"></span>'}<span>${label}</span></button>`;
     const seg = `<div class="seg" role="radiogroup">${[['normal', 'Normal cells'], ['neoplasm', 'Neoplasms'], ['both', 'Both']].map(([v, t]) => `<button role="radio" data-qcells="${v}" aria-checked="${c.cells === v}">${t}</button>`).join('')}</div>`;
@@ -135,8 +136,9 @@
     Q.done = true; Q.right = right; Q.answered++;
     if (right) { Q.score++; Q.streak++; if (Q.streak > best()) save('flowcyto.markersBest', Q.streak); } else Q.streak = 0;
     draw();
-    // a right answer moves on by itself; a wrong one waits for Next so the correction can be read
-    const q = Q.q; if (right) setTimeout(() => { if (Q.q === q && !$('#quiz').hidden) next(); }, 1100);
+    // Settings: seconds until the next question after a right / wrong answer (0 = wait for Next)
+    const q = Q.q, secs = +(right ? FC.prefs.quizRight : FC.prefs.quizWrong) || 0;
+    if (secs > 0) setTimeout(() => { if (Q.q === q && Q.done && !$('#quiz').hidden) next(); }, secs * 1000);
   }
 
   // ---------- swipe ----------
@@ -165,6 +167,7 @@
     if (!ev.target.closest('#quiz')) return;
     if (ev.target.closest('[data-qmenu]')) { location.hash = '/'; return; }
     if (ev.target.closest('[data-qsetup]')) return setup();
+    if (ev.target.closest('[data-qsettings]')) return FC.openSettings();
     const k = ev.target.closest('[data-qkind]'); if (k) { Q.cfg.kinds[k.dataset.qkind] = !Q.cfg.kinds[k.dataset.qkind]; save('flowcyto.markers', Q.cfg); return setup(); }
     const c = ev.target.closest('[data-qcells]'); if (c) { Q.cfg.cells = c.dataset.qcells; save('flowcyto.markers', Q.cfg); return setup(); }
     if (ev.target.closest('[data-qstart]')) return next();

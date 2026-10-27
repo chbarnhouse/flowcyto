@@ -49,7 +49,8 @@ html.in-game, html.in-game body { background: var(--card); }
 .board-head { flex: none; display: flex; gap: 10px; align-items: baseline; margin-bottom: 8px; min-width: 0; }
 .board-head h1 { font-size: var(--fs-lg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .plots { flex: 1; min-height: 0; display: grid; gap: 8px; align-content: start; justify-content: center; }
-.plots.scroll { overflow-y: auto; overscroll-behavior: contain; }
+.plots { overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+.plots { padding-bottom: 4px; }
 .plots-col.fit { flex: none; }
 .plots-col.fit .plots { flex: none; }
 .plots figure { margin: 0; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 4px; cursor: zoom-in;
@@ -83,7 +84,7 @@ html.in-game, html.in-game body { background: var(--card); }
 
 /* list (Diagnose the clone) */
 .dxrow { display: flex; gap: 6px; margin-bottom: 6px; }
-.dx { flex: 1; display: flex; align-items: center; gap: 8px; text-align: left; padding: 8px 10px; border: 1.5px solid var(--line); border-radius: 9px; font-size: var(--fs-sm); font-weight: 600; background: var(--card); cursor: pointer; }
+.dx { flex: 1; display: flex; align-items: center; gap: 8px; text-align: left; padding: calc(8px * var(--fit, 1)) 10px; border: 1.5px solid var(--line); border-radius: 9px; font-size: calc(var(--fs-sm) * var(--fit, 1)); font-weight: 600; background: var(--card); cursor: pointer; }
 .dx.no { color: var(--muted); background: var(--sunk); }
 .dx.no .nm { text-decoration: line-through; }
 .dx.yes { border: 3px solid var(--blue); background: var(--blue-bg); }
@@ -135,8 +136,17 @@ html.in-game, html.in-game body { background: var(--card); }
 /* ---------- settings ---------- */
 .settings { border: 1px solid var(--line); padding: 16px 18px; width: min(520px, calc(100vw - 24px)); color: var(--ink); background: var(--card); }
 .settings::backdrop { background: rgba(10,12,16,.45); }
-.set-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.set-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; position: sticky; top: -16px; z-index: 3; background: var(--card); margin: -16px -18px 6px; padding: 12px 18px 8px; border-bottom: 1px solid var(--line-soft); }
+.set-sec { margin: 14px 0 0; font-size: var(--fs-xs); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+#settings { max-height: min(86vh, 760px); overflow: auto; }
+/* phones: settings is a full screen page, its title and close button pinned */
+@media (max-width: 700px) {
+  #settings { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; border: 0; border-radius: 0; padding: 0 max(16px, calc(env(safe-area-inset-right, 0px) + 8px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(16px, calc(env(safe-area-inset-left, 0px) + 8px)); overscroll-behavior: contain; }
+  #settings .set-head { top: 0; margin: 0 -16px 6px; padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 8px; }
+  #settings .set-row .seg { flex-wrap: wrap; }
+}
 .set-head h2 { font-size: var(--fs-xl); }
+.set-head h2:focus { outline: none; }
 .set-row { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 12px 0; border-top: 1px solid var(--line-soft); }
 .set-row > div:first-child { flex: 1 1 200px; }
 .set-row b { display: block; }
@@ -305,7 +315,7 @@ html.in-game, html.in-game body { background: var(--card); }
   .panel .sub { display: none; } /* the rules show on wider screens; phones keep the room for plots */
   .panel .btn { min-height: 44px; }
   .panel .btn.mini { min-height: 34px; }
-  .dx { min-height: 46px; }
+  .dx { min-height: calc(46px * var(--fit, 1)); }
   .padlink { min-width: 48px; }
   .gchip { min-height: 40px; }
 }
@@ -315,7 +325,8 @@ html.in-game, html.in-game body { background: var(--card); }
 .gpick { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 0 0 12px; font-size: var(--fs-sm); font-weight: 700; }
 .gchip { display: inline-flex; gap: 4px; align-items: center; border: 1.5px solid var(--line); background: var(--card); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
 .gchip[aria-pressed="true"] { border: 3px solid var(--blue); background: var(--blue-bg); }
-.game.gating .plots figure, .zoom svg { touch-action: none; cursor: crosshair; }
+.game.gating .plots figure { touch-action: pan-x; cursor: crosshair; }
+.zoom svg { touch-action: none; cursor: crosshair; }
 .zoom-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 8px; font-size: var(--fs-sm); color: var(--muted); font-weight: 600; }
 
 
@@ -323,7 +334,8 @@ html.in-game, html.in-game body { background: var(--card); }
 /* ---------- press and hold: no text selection; the latch target ---------- */
 html.holdmode .game, html.holdmode .refpane, html.holdmode .zoom { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 html.holdmode .game input, html.holdmode .game select { -webkit-user-select: text; user-select: text; }
-html.holdmode .plots figure, html.holdmode #refBtn { touch-action: none; }
+html.holdmode #refBtn { touch-action: none; }
+html.holdmode .plots figure { touch-action: pan-x; } /* the strip still swipes sideways */
 .latch { position: fixed; left: 0; right: 0; z-index: 40; display: flex; align-items: center; justify-content: center; gap: 10px;
   background: var(--orange-bg); border-bottom: 2px solid var(--orange); pointer-events: none; padding-top: env(safe-area-inset-top, 0px); }
 .latch .ic { width: 22px; height: 22px; padding: 8px; box-sizing: content-box; border-radius: 50%; color: var(--orange); background: var(--card); border: 2px dashed var(--orange); }
@@ -365,16 +377,16 @@ html.holdmode .plots figure, html.holdmode #refBtn { touch-action: none; }
 .verdict { margin: 4px 0 0; font-size: var(--fs-sm); color: var(--ink-2); display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; }
 .verdict .ic { width: 16px; height: 16px; align-self: center; }
 /* swipe card */
-.swipe-wrap { position: relative; flex: 1; min-height: 320px; padding-top: 56px; display: grid; place-items: center; }
+.swipe-wrap { position: relative; flex: 1; min-height: 320px; padding-top: 56px; align-items: stretch; justify-items: stretch; display: grid; place-items: stretch; }
 .swipe-hint { position: absolute; z-index: 1; top: 0 !important; background: var(--card); border-radius: 12px; padding: 8px 10px; box-shadow: 0 4px 14px -6px rgba(10,12,16,.4); display: flex; flex-direction: row; align-items: center; gap: 4px; font-weight: 800; font-size: var(--fs-sm); opacity: 0; pointer-events: none; }
 .swipe-hint .ic { width: 24px; height: 24px; }
 .swipe-hint.left { left: 0; color: var(--orange); }
 .swipe-hint.right { right: 0; color: var(--blue); }
-.swipecard { width: min(100%, 360px); min-height: 260px; padding: 22px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; border: 2px solid var(--teal); touch-action: pan-y; cursor: grab; -webkit-user-select: none; user-select: none; transition: transform .2s ease; }
+.swipecard { width: 100%; max-width: 560px; justify-self: center; min-height: 300px; max-height: 620px; padding: 22px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; border: 2px solid var(--teal); touch-action: pan-y; cursor: grab; -webkit-user-select: none; user-select: none; transition: transform .2s ease; }
 .swipecard.dragging { transition: none; cursor: grabbing; }
-.swipecard .qcell { font-size: var(--fs-xl); font-weight: 800; }
+.swipecard .qcell { font-size: 28px; font-weight: 800; }
 .swipecard .qand { color: var(--muted); font-size: var(--fs-sm); }
-.swipecard .qmark { font-size: 34px; font-weight: 800; color: var(--teal); }
+.swipecard .qmark { font-size: 56px; font-weight: 800; color: var(--teal); }
 .swipecard.right { border-color: var(--blue); background: var(--blue-bg); }
 .swipecard.wrong { border: 2px dashed var(--orange); background: var(--orange-bg); }
 .yn { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -382,3 +394,23 @@ html.holdmode .plots figure, html.holdmode #refBtn { touch-action: none; }
 .yn .yes { border-color: var(--blue); color: var(--blue); }
 /* Next sits on the page, not on a card: give it a card face so it shows on the blue default page */
 .qmain > .btn.primary { background: var(--card); border-color: var(--card); color: var(--blue); }
+
+/* the quiz speaks in plain green (yes / right) and red (no / wrong), always with an icon and a word too */
+.quiz { --yes: #15a03c; --yes-bg: #dcf5e3; --nope: #d92b2b; --nope-bg: #fde2e2; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="default"]):not([data-theme="light"]) .quiz { --yes: #3fd46e; --yes-bg: #0f3a1d; --nope: #ff6464; --nope-bg: #431616; } }
+:root[data-theme="dark"] .quiz, :root[data-theme="black"] .quiz { --yes: #3fd46e; --yes-bg: #0f3a1d; --nope: #ff6464; --nope-bg: #431616; }
+.yn .btn.yes { background: var(--yes); border-color: var(--yes); color: #fff; }
+.yn .btn.no { background: var(--nope); border-color: var(--nope); color: #fff; }
+.swipe-hint.right { color: var(--yes); border: 2px solid var(--yes); }
+.swipe-hint.left { color: var(--nope); border: 2px solid var(--nope); }
+.swipecard.right { border: 4px solid var(--yes); background: var(--yes-bg); }
+.swipecard.wrong { border: 4px dashed var(--nope); background: var(--nope-bg); }
+.swipecard.right .verdict .ic { color: var(--yes); }
+.swipecard.wrong .verdict .ic { color: var(--nope); }
+.qopt.ok { border: 2px solid var(--yes); background: var(--yes-bg); }
+.qopt.ok .ic { color: var(--yes); border-color: var(--yes); }
+.qopt.missed { border: 2px dashed var(--nope); background: var(--nope-bg); }
+.qopt.missed .ic { color: var(--nope); border-color: var(--nope); }
+.qopt.bad { border: 2px solid var(--nope); background: var(--nope-bg); }
+.qopt.bad .ic { color: var(--nope); border-color: var(--nope); }
+.qcard .verdict .ic { color: currentColor; }
