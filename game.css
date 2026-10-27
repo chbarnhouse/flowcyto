@@ -342,6 +342,7 @@ html.holdmode .plots figure { touch-action: pan-x; } /* the strip still swipes s
 /* keep open = light blue, cross it out = gray; each with its own icon and words too */
 .latch .lz { --zc: var(--blue); --zb: var(--blue-bg); flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 8px; min-width: 0; background: var(--zb); border-bottom: 3px solid var(--zc); }
 .latch .lz.cross { --zc: var(--slate); --zb: var(--slate-bg); }
+.latch .lz.restore { --zc: var(--orange); --zb: var(--orange-bg); }
 .latch .lz + .lz { border-left: 2px dashed var(--line); }
 .latch .ic { flex: none; width: 20px; height: 20px; padding: 7px; box-sizing: content-box; border-radius: 50%; color: var(--zc); background: var(--card); border: 2px dashed var(--zc); }
 .latch span { font-size: var(--fs-sm); font-weight: 800; color: var(--ink); }

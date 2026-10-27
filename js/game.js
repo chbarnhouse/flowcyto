@@ -21,6 +21,7 @@
     wrong: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="var(--pink)" stroke-width="2.4" stroke-linecap="round"/></svg>',
     share: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 10V2.5M5.2 5L8 2.2 10.8 5M5 7.2H4a1 1 0 0 0-1 1V13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V8.2a1 1 0 0 0-1-1h-1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     strike: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3.8 12.2l8.4-8.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+    restore: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.2 7.6a5 5 0 1 1 1.5 4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M2.6 3.8v4h4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     link: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.8 9.2l2.4-2.4M7.4 4.6l1.2-1.2a2.6 2.6 0 0 1 3.7 3.7l-1.2 1.2M8.6 11.4l-1.2 1.2a2.6 2.6 0 0 1-3.7-3.7l1.2-1.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
     close: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
     eye: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8z" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="8" r="2.1" fill="currentColor"/></svg>',
@@ -531,12 +532,18 @@
   let holdKind = null, latched = false;
   /* Two drop zones over the top bar for a held plot: keep it open, or cross it out (it fades in the
      grid, to mark it as read). The held reference only has "keep it open". */
-  const ZONES = { keep: ['unlock', 'lock', 'Keep it open', 'Let go to keep it open'], cross: ['strike', 'strike', 'Cross it out', 'Let go to cross it out'] };
+  const ZONES = { keep: ['unlock', 'lock', 'Keep it open', 'Let go to keep it open'], cross: ['strike', 'strike', 'Cross it out', 'Let go to cross it out'],
+    restore: ['restore', 'restore', 'Restore it', 'Let go to restore it'] };
+  // the second zone on a plot already crossed out puts it back (orange, its own icon and words)
   function drawZones(kinds, on, tap) {
-    latchEl.innerHTML = kinds.map(z => { const [i0, i1, t0, t1] = ZONES[z], lit = on === z; return `<div class="lz ${z}${lit ? ' on' : ''}" data-lz="${z}">${tap && z === 'keep' ? ICON.close : ICON[lit ? i1 : i0]}<span>${tap ? tapLabel(z) : lit ? t1 : t0}</span></div>`; }).join('');
+    const crossed = zoomI != null && S.crossed.includes(zoomI);
+    latchEl.innerHTML = kinds.map(z => {
+      const look = z === 'cross' && crossed ? 'restore' : z, [i0, i1, t0, t1] = ZONES[look], lit = on === z;
+      const icon = tap && z === 'keep' ? ICON.close : ICON[lit ? i1 : i0], text = tap ? (z === 'keep' ? 'Close' : t0) : lit ? t1 : t0;
+      return `<div class="lz ${look}${lit ? ' on' : ''}" data-lz="${z}">${icon}<span>${text}</span></div>`;
+    }).join('');
     latchEl.classList.toggle('tap', !!tap);
   }
-  const tapLabel = z => z === 'keep' ? 'Close' : S.crossed.includes(zoomI) ? 'Restore it' : 'Cross it out';
   function placeLatch() { const r = $('.bar').getBoundingClientRect(); Object.assign(latchEl.style, { top: r.top + 'px', height: r.height + 'px' }); }
   function startHold(kind) {
     holdKind = kind; latched = null;
