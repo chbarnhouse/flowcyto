@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>FlowCyto</title>
 <meta name="description" content="FlowCyto: a flow cytometry logic puzzle for STEP 1. Read the dot plots, name the populations, find the clone.">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
@@ -17,8 +17,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=19">
-<link rel="stylesheet" href="game.css?v=19">
+<link rel="stylesheet" href="style.css?v=20">
+<link rel="stylesheet" href="game.css?v=20">
 <script>
 /* Appearance before anything draws (Settings → Appearance; game.js keeps it in step). Per device. */
 (function () {
@@ -30,6 +30,9 @@
      the header's own color so the two are one strip from the first frame. */
   var bar = { dark: '#181d25', black: '#0e0f12' }[theme] || '#ffffff';
   document.querySelector('meta[name="theme-color"]').setAttribute('content', bar);
+  /* No page zoom: iOS ignores user-scalable for pinches, so stop the gesture itself (a double tap is
+     handled by touch-action in game.css). */
+  document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
 })();
 </script>
 </head>
@@ -64,10 +67,10 @@
 <div id="latch" class="latch" hidden aria-hidden="true"></div>
 <dialog id="acts" class="settings card"></dialog>
 
-<script src="js/kb.js?v=19"></script>
-<script src="js/gen.js?v=19"></script>
-<script src="js/plot.js?v=19"></script>
-<script src="js/markers.js?v=19"></script>
-<script src="js/game.js?v=19"></script>
+<script src="js/kb.js?v=20"></script>
+<script src="js/gen.js?v=20"></script>
+<script src="js/plot.js?v=20"></script>
+<script src="js/markers.js?v=20"></script>
+<script src="js/game.js?v=20"></script>
 </body>
 </html>

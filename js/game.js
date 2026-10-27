@@ -41,7 +41,7 @@
   // ---------- storage (every access guarded: private windows may refuse) ----------
   const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || 'null') || d; } catch (e) { return d; } };
   const save = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* stats/prefs just don't persist */ } };
-  const prefs = Object.assign({ enlarge: 'hold', refOpen: 'hold', gscale: 1, plotRows: 2, quizRight: 3, quizWrong: 0, autoCheck: false, timer: false, tours: {},
+  const prefs = Object.assign({ enlarge: 'hold', refOpen: 'hold', gscale: 1, plotRows: 2, cellAxis: 'rows', quizRight: 3, quizWrong: 0, autoCheck: false, timer: false, tours: {},
     custom: { pops: 4, gating: false, choose: false, decoys: true, extra: true, ref: 'filled', spread: 'normal', pct: false, scratch: true, dx: 'choice' } }, load('flowcyto.prefs', {}));
   prefs.appearance = Object.assign({ mode: 'auto', light: 'default', dark: 'dark' }, prefs.appearance || {});
   prefs.custom = Object.assign({ scratch: true, dx: 'choice' }, prefs.custom);
@@ -350,13 +350,13 @@
   function fitPlots() {
     const grid = $('#plots'); if (!S || !grid.clientWidth) return;
     const n = S.P.plots.length, gap = parseFloat(getComputedStyle(grid).columnGap) || 8, pad = 10, cap = 16;
-    const R = Math.min(n, +prefs.plotRows === 1 ? 1 : 2), phone = stacked(), W = grid.clientWidth;
+    const R = n <= 2 || +prefs.plotRows === 1 ? 1 : 2, phone = stacked(), W = grid.clientWidth;
     $('.plots-col').classList.toggle('fit', phone);
     let s;
     if (!phone) { grid.style.height = ''; s = Math.max(64, Math.min(330, Math.floor((grid.clientHeight + gap) / R - gap - pad - cap))); }
     else {
       const sDef = Math.floor((W + gap) / (R === 1 ? 2.25 : 2.75) - gap - pad);
-      const key = [S.level, S.seed, S.phase, S.cols.length, R, W, innerHeight, prefs.gscale].join();
+      const key = [S.level, S.seed, S.phase, S.cols.length, R, W, innerHeight, prefs.gscale, prefs.cellAxis].join();
       // only size against a panel drawn for this step (the plots draw first on a new board)
       if (S.plotKey === key || S.panelDrawn !== S.phase) s = S.plotKey === key ? S.plotS : sDef;
       else {
@@ -433,6 +433,8 @@
     return { neg: '−', pos: '+', dim: 'dim' }[a[0]];
   }
   const padFilled = id => refFilled() || S.peeks.has(id);
+  // Settings → Cell types: down the side of both grids (default) or across the top of both
+  const typesAsRows = () => prefs.cellAxis !== 'cols';
   function refHTML() {
     const mks = markersOf(shownPlots()), ro = refFilled(), left = S.refs.filter(id => !S.peeks.has(id)).length;
     let h = refHeld ? '' : `<button class="refclose" data-refclose aria-label="Close the reference">${ICON.close}</button>`;
@@ -440,21 +442,25 @@
     h += `<p class="sub">${ro ? 'Each cell type, read on the markers these plots show.' : 'Fill in each cell type\'s markers from memory: tap a cell to cycle its value. The eye fills a row from the key and counts as a peek; anything you had wrong gets a wavy underline.'}</p>`;
     if (!S.refs.length) h += `<p class="empty">No cell types yet. Add the ones you want to look up${choosing() ? '; normal cell types join the scratchpad too' : ''}.</p>`;
     else {
-      h += `<div class="gridwrap"><table class="pad ${ro ? 'ro' : 'ed'}"><thead><tr><th></th>${mks.map(mk => `<th scope="col">${mk === 'LC' ? 'κ/λ' : esc(mk)}</th>`).join('')}${ro ? '' : '<th></th>'}</tr></thead><tbody>`;
-      for (const id of S.refs) {
-        const filled = padFilled(id);
-        h += `<tr class="${S.refRow === id ? 'hl' : ''}" data-padrow="${id}"><th scope="row" title="${esc(BY[id].long)}"><button class="rowh" data-refmenu="${id}">${esc(BY[id].name)}</button></th>`;
-        for (const mk of mks) {
-          const mine = S.pad[id + '|' + mk];
-          if (filled) {
-            const v = truth(id, mk), diff = mine && mine !== v;
-            h += `<td class="pv ${padClass(v)}${diff ? ' diff' : ''}"${diff ? ` title="you had ${esc(PAD_TEXT[mine] || mine)}"` : ''}><span>${esc(PAD_TEXT[v] || v)}</span></td>`;
-          } else {
-            h += `<td class="pv ${padClass(mine)}"><button data-pad="${id}|${mk}" aria-label="${esc(BY[id].name)}, ${esc(mk)}: ${mine ? esc(mine) : 'blank'}">${mine ? esc(PAD_TEXT[mine] || mine) : ''}</button></td>`;
-          }
+      const td = (id, mk) => {
+        const mine = S.pad[id + '|' + mk], hl = S.refRow === id && !typesAsRows() ? ' hl' : '';
+        if (padFilled(id)) {
+          const v = truth(id, mk), diff = mine && mine !== v;
+          return `<td class="pv ${padClass(v)}${diff ? ' diff' : ''}${hl}"${diff ? ` title="you had ${esc(PAD_TEXT[mine] || mine)}"` : ''}><span>${esc(PAD_TEXT[v] || v)}</span></td>`;
         }
-        if (!ro) h += `<td class="rv">${filled ? '<span class="tally" title="peeked">seen</span>' : `<button class="reveal" data-reveal="${id}" aria-label="Reveal ${esc(BY[id].name)} (counts as a peek)" title="Reveal (counts as a peek)">${ICON.eye}</button>`}</td>`;
-        h += '</tr>';
+        return `<td class="pv ${padClass(mine)}${hl}"><button data-pad="${id}|${mk}" aria-label="${esc(BY[id].name)}, ${esc(mk)}: ${mine ? esc(mine) : 'blank'}">${mine ? esc(PAD_TEXT[mine] || mine) : ''}</button></td>`;
+      };
+      const name = id => `<button class="rowh" data-refmenu="${id}">${esc(BY[id].name)}</button>`;
+      const reveal = id => padFilled(id) ? '<span class="tally" title="peeked">seen</span>' : `<button class="reveal" data-reveal="${id}" aria-label="Reveal ${esc(BY[id].name)} (counts as a peek)" title="Reveal (counts as a peek)">${ICON.eye}</button>`;
+      const mkName = mk => mk === 'LC' ? 'κ/λ' : esc(mk);
+      if (typesAsRows()) {
+        h += `<div class="gridwrap"><table class="pad ${ro ? 'ro' : 'ed'}"><thead><tr><th></th>${mks.map(mk => `<th scope="col">${mkName(mk)}</th>`).join('')}${ro ? '' : '<th></th>'}</tr></thead><tbody>`;
+        for (const id of S.refs) h += `<tr class="${S.refRow === id ? 'hl' : ''}" data-padrow="${id}"><th scope="row" title="${esc(BY[id].long)}">${name(id)}</th>${mks.map(mk => td(id, mk)).join('')}${ro ? '' : `<td class="rv">${reveal(id)}</td>`}</tr>`;
+      } else {
+        // cell types across the top (as in the scratchpad), markers down the side
+        h += `<div class="gridwrap"><table class="pad t ${ro ? 'ro' : 'ed'}"><thead><tr><th></th>${S.refs.map(id => `<th scope="col" class="${S.refRow === id ? 'hl' : ''}" data-padrow="${id}" title="${esc(BY[id].long)}">${name(id)}</th>`).join('')}</tr></thead><tbody>`;
+        for (const mk of mks) h += `<tr><th scope="row">${mkName(mk)}</th>${S.refs.map(id => td(id, mk)).join('')}</tr>`;
+        if (!ro) h += `<tr><th></th>${S.refs.map(id => `<td class="rv">${reveal(id)}</td>`).join('')}</tr>`;
       }
       h += '</tbody></table></div>';
     }
@@ -540,27 +546,43 @@
     if (!box) return;
     const fits = () => box.scrollHeight <= box.clientHeight + 1;
     const apply = f => { box.style.setProperty('--fit', f); box.style.setProperty('--gs', (+prefs.gscale || 1) * f); fitGrid(table, wrap, f); };
-    apply(1);
-    if (fits()) return;
-    for (const f of [0.92, 0.84, 0.76]) { apply(f); if (fits()) return; }
+    // sideways names: shorten them only when a little is all it takes to fit
+    const trimV = () => {
+      const els = [...box.querySelectorAll('.lgrid:not(.t) .colh, .pad.t thead .rowh')]; if (!els.length) return false;
+      const over = box.scrollHeight - box.clientHeight, tall = Math.max(...els.map(e => e.offsetHeight)), target = tall - over - 2;
+      if (target < Math.max(tall * 0.6, 60)) return false;
+      els[0].closest('table').style.setProperty('--vmax', target + 'px');
+      return fits();
+    };
+    for (const f of [1, 0.92, 0.84, 0.76]) { apply(f); if (fits() || trimV()) return; }
     apply(1);
   }
   // the panel's height settles after the plots lay out (and changes on rotation): fit again when it does
   let panelH = 0;
   new ResizeObserver(() => { const el = $('#panel'); if (!S || el.clientHeight === panelH) return; panelH = el.clientHeight; fitHeight(el, el.querySelector('.lgrid'), el.querySelector('.gridwrap')); }).observe($('#panel'));
+  /* Size a grid's cells to the width it has; names are never cut unless a little shortening is all
+     it takes to avoid scrolling sideways (if it has to scroll anyway, they stay whole). */
   function fitGrid(table, wrap, fit = 1) {
     if (!table || !wrap) return;
-    const gs = (+prefs.gscale || 1) * fit, n = table.querySelector('tr').children.length - 1;
-    const head = table.classList.contains('lgrid') ? 64 : 116, avail = wrap.clientWidth - head * gs;
-    const answer = table.classList.contains('lgrid');
+    const gs = (+prefs.gscale || 1) * fit, answer = table.classList.contains('lgrid'), t = table.classList.contains('t');
+    table.style.setProperty('--namemax', 'none'); table.style.setProperty('--vmax', 'none');
+    const head = table.querySelector('thead tr'), n = [...head.children].slice(1).filter(th => !th.classList.contains('addcol') && (th.textContent.trim() !== '' || th.querySelector('button'))).length;
+    const headW = Math.max(0, ...[...table.querySelectorAll('tbody th')].map(th => th.offsetWidth));
+    const ws = getComputedStyle(wrap), inner = wrap.clientWidth - parseFloat(ws.paddingLeft) - parseFloat(ws.paddingRight);
+    const trail = table.classList.contains('ed') && !t ? 40 : 0, avail = inner - headW - trail;
     // A few scratchpad columns get wide cells with their names written across (no tall sideways labels).
-    const flat = answer && n > 0 && n <= 4 && avail / n >= 64 * gs;
-    const [lo, hi] = answer ? (flat ? [64, 96] : [30, 46]) : table.classList.contains('ro') ? [24, 32] : [34, 40];
+    const flat = answer && !t && n > 0 && n <= 4 && avail / n >= 64 * gs;
+    const [lo, hi] = answer ? (t ? [36, 64] : flat ? [64, 96] : [30, 46]) : table.classList.contains('ro') ? [24, 32] : [34, 40];
     const cell = Math.max(lo * gs, Math.min(hi * gs, Math.floor(avail / Math.max(1, n))));
     table.classList.toggle('flat', flat);
     table.style.setProperty('--cell', cell + 'px');
-    table.style.setProperty('--row', (flat ? Math.min(46 * gs, cell * 0.62) : cell) + 'px');
-    wrap.classList.toggle('scrolls', table.scrollWidth > wrap.clientWidth + 1);
+    table.style.setProperty('--row', (t && answer ? Math.min(44 * gs, Math.max(34 * gs, cell * 0.8)) : flat ? Math.min(46 * gs, cell * 0.62) : cell) + 'px');
+    const over = table.offsetWidth - inner;
+    if (over > 1 && (t === answer)) { // names down the side: lgrid.t, or the reference with types as rows
+      const target = headW - over - 4;
+      if (target >= Math.max(headW * 0.6, 72 * gs)) table.style.setProperty('--namemax', target + 'px');
+    }
+    wrap.classList.toggle('scrolls', table.offsetWidth > inner + 1);
   }
 
   // ---------- answer panel: scratchpad, then diagnosis ----------
@@ -574,16 +596,21 @@
     if (gating()) h += `<p class="gstat">${S.gates.some(Boolean) ? `${plural(S.groups.length, 'group')}${S.extraGroups ? ` (+${S.extraGroups} too many to letter)` : ''}` : 'No gates yet: drag on a plot to place one'} · this tube has ${P.pops.length} populations</p>`;
     else h += `<p class="sub">Give every population an identity; none is used twice${S.cfg.dx ? ', and exactly one is the abnormal clone' : ''}. Tap a cell: ruled out, then chosen, then blank. Tap a letter to highlight it in every plot.</p>`;
     if (!S.cols.length) h += `<p class="empty">Choose which cell types to consider${S.cfg.dx ? ', including Abnormal (clone)' : ''}.</p>`;
-    h += `<div class="gridwrap"><table class="lgrid"><thead><tr><th></th>${S.cols.map(id => `<th><button class="colh${id === 'abn' ? ' abn' : ''}" data-colh="${id}" title="${esc(BY[id].long)}">${esc(nameOf(id))}</button></th>`).join('')}${choosing() && play ? `<th class="addcol">${addSelect('data-addcol', 'Add', S.cols, true)}</th>` : ''}</tr></thead><tbody>`;
-    for (const p of rows()) {
-      const c = S.checked[p.label];
-      h += `<tr data-row="${p.label}" class="${S.focus === p.slot ? 'focus' : ''}"><th data-focus="${p.label}">${rowTag(p)}${c ? `<span class="rowmark ${c}">${ICON[c]}<span>${c}</span></span>` : ''}</th>`;
-      for (const id of S.cols) {
-        const m = S.marks[p.label + '|' + id];
-        h += `<td class="${m || ''}"><button data-cell="${p.label}|${id}" ${play ? '' : 'disabled'} aria-label="${p.label}, ${esc(nameOf(id))}: ${m ? MARK_WORD[m] : 'blank'}">${m ? ICON[m] : ''}</button></td>`;
+    const cell = (p, id) => { const m = S.marks[p.label + '|' + id]; return `<td class="${m || ''}"><button data-cell="${p.label}|${id}" ${play ? '' : 'disabled'} aria-label="${p.label}, ${esc(nameOf(id))}: ${m ? MARK_WORD[m] : 'blank'}">${m ? ICON[m] : ''}</button></td>`; };
+    const colName = id => `<button class="colh${id === 'abn' ? ' abn' : ''}" data-colh="${id}" title="${esc(BY[id].long)}">${esc(nameOf(id))}</button>`;
+    const popHead = p => { const c = S.checked[p.label]; return `${rowTag(p)}${c ? `<span class="rowmark ${c}">${ICON[c]}<span>${c}</span></span>` : ''}`; };
+    if (typesAsRows()) {
+      // cell types down the side (as in the reference), populations across the top
+      h += `<div class="gridwrap"><table class="lgrid t"><thead><tr><th></th>${rows().map(p => `<th data-focus="${p.label}" class="${S.focus === p.slot ? 'focus' : ''}">${popHead(p)}</th>`).join('')}</tr></thead><tbody>`;
+      for (const id of S.cols) h += `<tr><th>${colName(id)}</th>${rows().map(p => cell(p, id)).join('')}</tr>`;
+      if (choosing() && play) h += `<tr><th class="addcol">${addSelect('data-addcol', 'Add', S.cols, true)}</th></tr>`;
+    } else {
+      h += `<div class="gridwrap"><table class="lgrid"><thead><tr><th></th>${S.cols.map(id => `<th>${colName(id)}</th>`).join('')}${choosing() && play ? `<th class="addcol">${addSelect('data-addcol', 'Add', S.cols, true)}</th>` : ''}</tr></thead><tbody>`;
+      for (const p of rows()) {
+        h += `<tr data-row="${p.label}" class="${S.focus === p.slot ? 'focus' : ''}"><th data-focus="${p.label}">${popHead(p)}</th>${S.cols.map(id => cell(p, id)).join('')}`;
+        if (choosing() && play) h += '<td class="addcol"></td>';
+        h += '</tr>';
       }
-      if (choosing() && play) h += '<td class="addcol"></td>';
-      h += '</tr>';
     }
     h += '</tbody></table></div>';
     const ready = rows().length > 0 && rows().every(p => S.cols.some(id => S.marks[p.label + '|' + id] === 'yes'));
@@ -1172,6 +1199,7 @@
     if (!quiz) {
       if (!S) h += sec('Puzzles');
       h += `<div class="set-row"><div><b>Plot rows</b><span>Plots sit in a strip that scrolls sideways, in one row or two.</span></div>${seg('plotRows', [[1, 'One'], [2, 'Two']])}</div>`;
+      h += `<div class="set-row"><div><b>Cell types</b><span>Where the cell types sit in both the scratchpad and the reference.</span></div>${seg('cellAxis', [['rows', 'Down the side'], ['cols', 'Across the top']])}</div>`;
       h += `<div class="set-row"><div><b>Grid size</b><span>Scratchpad, reference and diagnosis text and cells.</span></div>${seg('gscale', [[0.85, 'Small'], [1, 'Medium'], [1.2, 'Large'], [1.4, 'Larger']])}</div>`;
       h += `<div class="set-row"><div><b>Enlarge a plot</b><span>Press and hold shows it while your finger is down; tap opens it until you tap again. On gated levels a tap always opens it, so you can place its gate.</span></div>${seg('enlarge', [['hold', 'Press and hold'], ['tap', 'Tap']])}</div>`;
       h += `<div class="set-row"><div><b>Open the reference</b><span>For the read-only reference. When you fill it in yourself it always opens on a tap.</span></div>${seg('refOpen', [['hold', 'Press and hold'], ['tap', 'Tap']])}</div>`;

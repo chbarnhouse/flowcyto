@@ -115,7 +115,7 @@ html.in-game, html.in-game body { background: var(--card); }
 .padwrap { overflow-x: auto; margin: 0 -4px; padding: 0 4px; }
 .pad { border-collapse: collapse; font-size: var(--fs-sm); }
 .pad thead th { font-size: var(--fs-xs); font-weight: 700; padding: 0 2px 4px; white-space: nowrap; color: var(--ink-2); }
-.pad tbody th { text-align: left; font-weight: 600; font-size: var(--fs-xs); max-width: 112px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 6px; }
+.pad tbody th { text-align: left; font-weight: 600; font-size: var(--fs-xs); max-width: var(--namemax, none); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 6px; }
 .pad tr.hl th { color: var(--blue); }
 .pad tr.hl td.pv { box-shadow: inset 0 0 0 1px var(--blue); }
 .pad td.pv { width: 34px; min-width: 34px; height: 30px; border: 1px solid var(--line); text-align: center; padding: 0; font-weight: 800; font-size: var(--fs-sm); }
@@ -192,7 +192,7 @@ html.in-game, html.in-game body { background: var(--card); }
 .lgrid .colh { width: 100%; }
 .lgrid.flat .colh { writing-mode: horizontal-tb; transform: none; white-space: normal; text-align: center; line-height: 1.2; padding: 4px 2px; }
 .lgrid.flat thead th { vertical-align: bottom; }
-.lgrid .colh { font-size: calc(var(--fs-xs) * var(--gs, 1)); max-height: none; }
+.lgrid .colh { font-size: calc(var(--fs-xs) * var(--gs, 1)); max-height: var(--vmax, none); }
 .lgrid td.addcol, .lgrid th.addcol { border: 0; width: auto !important; vertical-align: bottom; }
 .empty { text-align: center; color: var(--muted); font-size: var(--fs-sm); margin: 10px 0; }
 .dxlist { display: flex; flex-direction: column; gap: 0; }
@@ -220,7 +220,7 @@ html.in-game, html.in-game body { background: var(--card); }
 .pad td.pv { width: var(--cell, 34px) !important; min-width: var(--cell, 34px) !important; height: calc(var(--cell, 34px) * .9) !important; }
 .pad.ro td.pv { font-size: calc(var(--fs-xs) * var(--gs, 1) * 1.1); }
 .pad thead th { font-size: calc(var(--fs-xs) * var(--gs, 1)); }
-.pad tbody th { font-size: calc(var(--fs-xs) * var(--gs, 1)); max-width: calc(116px * var(--gs, 1)); }
+.pad tbody th { font-size: calc(var(--fs-xs) * var(--gs, 1)); max-width: var(--namemax, none); }
 .rowh { border: 0; background: none; padding: 0; font: inherit; color: var(--blue); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; text-align: left; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* action sheet (column / row options) and custom setup reuse the settings dialog */
@@ -452,3 +452,22 @@ html.holdmode .plots figure { touch-action: pan-x; } /* the strip still swipes s
 .set-row.qset .qchips span, .set-row.qset .qrow span { display: inline; font-size: inherit; color: inherit; margin: 0; }
 .set-row.qset .qchips span.ic { display: inline-block; }
 .set-row.qset > div:first-child { flex: none; }
+
+/* ---------- cell types down the side (Settings → Cell types): scratchpad populations go across ---------- */
+.lgrid.t .colh { writing-mode: horizontal-tb; transform: none; text-align: left; width: auto; max-height: none; max-width: var(--namemax, none); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 8px 0 0; font-size: calc(var(--fs-sm) * var(--gs, 1)); }
+.lgrid.t tbody th { padding-right: 0; }
+.lgrid.t thead th:not(:first-child) { text-align: center; vertical-align: bottom; padding: 0 0 4px; cursor: pointer; }
+.lgrid.t thead th .rowmark { display: flex; justify-content: center; margin: 2px 0 0; }
+.lgrid.t thead th.focus { color: var(--blue); text-decoration: underline; text-underline-offset: 3px; }
+.lgrid.t th.addcol { padding-top: 6px; }
+/* cell types across the top of the reference: names written sideways, markers down the side */
+.pad.t thead th:not(:first-child) { vertical-align: bottom; padding: 0 0 4px; }
+.pad.t thead .rowh { writing-mode: vertical-rl; transform: rotate(180deg); max-height: var(--vmax, none); max-width: none; font-size: calc(var(--fs-xs) * var(--gs, 1)); font-weight: 700; }
+.pad.t thead th.hl .rowh { color: var(--ink); }
+.pad.t tbody th { font-weight: 700; }
+.pad td.pv.hl { box-shadow: inset 0 0 0 1px var(--blue); }
+.pad.t td.rv { padding: 4px 0 0; text-align: center; }
+
+/* no double-tap zoom anywhere (fast taps on grid cells used to zoom the page) */
+html, body { touch-action: manipulation; }
+.refpane .sub { padding-right: 40px; } /* clear of the floating close button */
