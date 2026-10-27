@@ -70,7 +70,7 @@
   // ---------- difficulty ----------
   const LEVELS = {
     easy: { label: 'Easy', pops: 3, decoys: 2, dx: 3, clone: 0.7, extra: 2, herring: 0, pct: false, wantMatching: false },
-    medium: { label: 'Medium', pops: 4, decoys: 3, dx: 4, clone: 1, extra: 0, herring: 0, pct: false, wantMatching: true },
+    medium: { label: 'Medium', pops: 4, decoys: 3, dx: 4, cloneMin: 2, clone: 1, extra: 0, herring: 0, pct: false, wantMatching: true },
     hard: { label: 'Hard', pops: 5, decoys: 4, dx: 5, clone: 1, extra: 0, herring: 1, pct: true, wantMatching: true },
   };
 
@@ -127,11 +127,14 @@
       const hall = clone ? candidates.filter(p => plotMarkers(p).some(mk => BY[clone].key.includes(mk))) : [];
       const telling = hall.filter(p => pool.some(id => id !== clone && !fits(id, cp, plotMarkers(p))));
       const pinned = (telling.length ? pick(r, telling) : hall.length ? pick(r, hall) : null);
+      const informs = q => pool.some(id => id !== clone && !fits(id, cp, plotMarkers(q)));
       // Sudoku-style clue removal.
       let shown = candidates.slice();
       for (const p of shuffle(r, candidates)) {
         if (p === pinned) continue;
         const trial = shown.filter(q => q !== p);
+        // Diagnose-the-clone Medium keeps at least cloneMin marker plots that bear on the clone.
+        if (cloneMode && cfg.cloneMin && trial.filter(q => informs(q)).length < cfg.cloneMin) continue;
         if (unique(trial)) shown = trial;
       }
       const needsMatching = !cloneMode && countSolutions(pops, pool, markersOf(shown)).cand.some(c => c.length > 1);
