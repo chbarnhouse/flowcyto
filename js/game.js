@@ -19,6 +19,7 @@
     yes: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5" fill="var(--blue)" stroke="var(--ink)" stroke-width="1"/></svg>',
     right: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 5" fill="none" stroke="var(--teal)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     wrong: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="var(--pink)" stroke-width="2.4" stroke-linecap="round"/></svg>',
+    link: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.8 9.2l2.4-2.4M7.4 4.6l1.2-1.2a2.6 2.6 0 0 1 3.7 3.7l-1.2 1.2M8.6 11.4l-1.2 1.2a2.6 2.6 0 0 1-3.7-3.7l1.2-1.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
     close: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
     eye: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8z" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="8" r="2.1" fill="currentColor"/></svg>',
     book: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 3.2c2-.9 3.8-.9 5.5.3 1.7-1.2 3.5-1.2 5.5-.3v9.6c-2-.9-3.8-.9-5.5.3-1.7-1.2-3.5-1.2-5.5-.3zM8 3.5v9.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
@@ -121,6 +122,8 @@
     document.title = 'FlowCyto';
     const stats = load('flowcyto.stats', {}), cur = load('flowcyto.current', null);
     let h = `<main class="menu-in"><div class="menu-top"><div class="logo on-page"><svg width="52" height="52" viewBox="0 0 22 22" aria-hidden="true"><rect x="1" y="1" width="20" height="20" rx="5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M11 3v16M3 11h16" stroke="currentColor" stroke-width="1" stroke-dasharray="2 2"/><circle cx="7" cy="15" r="2.2" fill="currentColor"/><path d="M15 4.6l2.2 3.6h-4.4z" fill="currentColor"/></svg><div><h1>FlowCyto</h1><p>Flow cytometry logic puzzles for STEP 1</p></div></div><button class="gearbtn" data-settings aria-label="Settings" title="Settings">${ICON.gear}</button></div>`;
+    // Charlie's own copy (not the public one) offers the public link to pass on
+    if (!PUBLIC_HOST.test(location.hostname)) h += `<div class="share-row"><button class="sharebtn" data-share>${ICON.link}<span>Copy shareable link</span></button></div>`;
     if (cur && cur.phase !== 'done' && LEVEL_KEYS.includes(cur.level)) {
       h += `<button class="card cont" data-continue><span class="cont-k">Continue</span><b>${levelLabel(cur.level)}</b><span>${cur.phase === 'dx' ? 'Diagnosis' : 'Scratchpad'} · ${plural(cur.wrongChecks || 0, 'mistake')}</span>${ICON.next}</button>`;
     }
@@ -143,7 +146,19 @@
     if (ev.target.closest('[data-custom]')) return openCustom();
     if (ev.target.closest('[data-markers]')) { location.hash = 'markers'; return; }
     if (ev.target.closest('[data-settings]')) openSettings();
+    const sh = ev.target.closest('[data-share]'); if (sh) copyShareLink(sh);
   });
+  const PUBLIC_URL = 'https://chbarnhouse.github.io/flowcyto/', PUBLIC_HOST = /\.github\.io$/;
+  async function copyShareLink(btn) {
+    let ok = false;
+    try { await navigator.clipboard.writeText(PUBLIC_URL); ok = true; } catch (e) {
+      const t = Object.assign(document.createElement('textarea'), { value: PUBLIC_URL }); document.body.append(t); t.select();
+      try { ok = document.execCommand('copy'); } catch (e2) { /* nothing more to try */ } t.remove();
+    }
+    btn.innerHTML = ok ? `<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Copied: ${PUBLIC_URL.replace('https://', '')}</span>` : `<span>Copy failed: ${PUBLIC_URL}</span>`;
+    btn.classList.toggle('done', ok);
+    setTimeout(() => { if (btn.isConnected) { btn.innerHTML = `${ICON.link}<span>Copy shareable link</span>`; btn.classList.remove('done'); } }, 2500);
+  }
 
   // ---------- custom level ----------
   const csheet = $('#acts');
