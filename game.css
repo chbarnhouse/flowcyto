@@ -28,8 +28,12 @@
 .menu-foot { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; font-size: var(--fs-xs); }
 
 /* ---------- game shell: no page scroll; plots fit the space that's left ---------- */
-.game { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
-.bar { flex: none; background: var(--card); border-bottom: 1px solid var(--line); padding-top: env(safe-area-inset-top, 0px); }
+.game { display: flex; flex-direction: column; height: 100vh; height: 100dvh; background: var(--bg, var(--paper)); }
+/* Safari tints the status-bar strip (and its toolbar) with the page's own background, not theme-color.
+   During a game the page background is the header's color, so the strip and the header are one
+   surface; the board keeps its own background. */
+html.in-game, html.in-game body { background: var(--card); }
+.bar { flex: none; position: sticky; top: 0; z-index: 12; background: var(--card); border-bottom: 1px solid var(--line); padding-top: env(safe-area-inset-top, 0px); }
 .bar-in { max-width: 1400px; margin: 0 auto; padding: 8px 16px; display: flex; gap: 8px; align-items: center; }
 .iconbtn { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 6px 10px; border: 1.5px solid transparent; border-radius: var(--ctrl); background: none; font-weight: 600; font-size: var(--fs-sm); cursor: pointer; color: var(--ink-2); }
 .iconbtn:hover { border-color: var(--line); }

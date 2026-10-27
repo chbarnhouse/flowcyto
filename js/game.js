@@ -114,6 +114,7 @@
     if (S) { pauseTimer(); persist(); }
     S = null; endTour(); closeRef(true);
     $('#game').hidden = true; $('#menu').hidden = false;
+    document.documentElement.classList.remove('in-game');
     document.title = 'FlowCyto';
     const stats = load('flowcyto.stats', {}), cur = load('flowcyto.current', null);
     let h = `<main class="menu-in"><div class="menu-top"><div class="logo on-page"><svg width="52" height="52" viewBox="0 0 22 22" aria-hidden="true"><rect x="1" y="1" width="20" height="20" rx="5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M11 3v16M3 11h16" stroke="currentColor" stroke-width="1" stroke-dasharray="2 2"/><circle cx="7" cy="15" r="2.2" fill="currentColor"/><path d="M15 4.6l2.2 3.6h-4.4z" fill="currentColor"/></svg><div><h1>FlowCyto</h1><p>Flow cytometry logic puzzles for STEP 1</p></div></div><button class="gearbtn" data-settings aria-label="Settings" title="Settings">${ICON.gear}</button></div>`;
@@ -180,6 +181,7 @@
     $('#game').classList.toggle('gating', gating());
     if (location.hash.slice(1) !== `${level}/${seed}`) history.replaceState(null, '', `#${level}/${seed}`);
     $('#menu').hidden = true; $('#game').hidden = false;
+    document.documentElement.classList.add('in-game');
     $('#gMode').innerHTML = `<span class="long">${levelLabel(level)}</span><span class="short">${levelLabel(level)}</span>`;
     $('#gLevel').textContent = '';
     $('#specName').textContent = P.specName;
@@ -432,7 +434,8 @@
   function openRef(row) {
     if (!S) return;
     if (row) { S.refRow = row; addTo(S.refs, row); }
-    placeRef(); drawRef(); refPane.hidden = false; refAt = performance.now();
+    // show first, then draw: a hidden pane measures zero wide and would size its cells too small
+    placeRef(); refPane.hidden = false; drawRef(); refAt = performance.now();
     const r = row && refPane.querySelector(`[data-padrow="${row}"]`); if (r) r.scrollIntoView({ block: 'nearest' });
   }
   function closeRef(silent) { refPane.hidden = true; refPane.innerHTML = ''; refHeld = false; if (!silent && S) drawPanel(); }
