@@ -20,6 +20,9 @@ python3 -m http.server 8793
 
 Then open http://localhost:8793. The URL hash names the board (`#pops/medium/12345`), so any board can be replayed.
 
+## Charlie's copy
+https://flowcyto.chbarnhouse.com (LAN/VPN only). `./deploy.sh` pushes the static files into the container and restarts `flowcyto.service` (python3 http.server on port 8020); `--setup` on the first run. Settings in `deploy.env` (git-ignored; see `deploy.env.example`).
+
 ## Files
 - `js/kb.js`: markers, normal populations, neoplasms (marker profiles, hallmarks, teaching lines), specimens, and the curated plot pairs.
 - `js/gen.js`: seeded generator, uniqueness solver, sudoku-style clue removal, and event simulation.
