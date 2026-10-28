@@ -20,6 +20,8 @@
     yes: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5" fill="var(--blue)" stroke="var(--ink)" stroke-width="1"/></svg>',
     maybe: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.6 5.8a2.4 2.4 0 1 1 3.3 2.2c-.6.3-.9.8-.9 1.4v.6" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round"/><circle cx="8" cy="12.9" r="1.2" fill="var(--gold)"/></svg>',
     erase: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.8l3.7 3.7-6.4 6.4H3.9L2.4 11.4a1.2 1.2 0 0 1 0-1.7z M6 6.3l3.7 3.7 M7 12.9h6.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>',
+    tick: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 5" fill="none" stroke="var(--yes)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    square: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="3.5" width="9" height="9" rx="1" fill="var(--nope)"/></svg>',
     right: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 5" fill="none" stroke="var(--teal)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     wrong: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="var(--pink)" stroke-width="2.4" stroke-linecap="round"/></svg>',
     share: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 10V2.5M5.2 5L8 2.2 10.8 5M5 7.2H4a1 1 0 0 0-1 1V13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V8.2a1 1 0 0 0-1-1h-1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
@@ -677,10 +679,11 @@
     const cell = (p, id) => {
       let m = S.marks[p.label + '|' + id], implied = false;
       if (m !== 'yes' && m !== 'no' && (yesRows.has(p.label) || yesCols.has(id))) { m = 'no'; implied = true; }
-      return `<td class="${m || ''}${implied ? ' implied' : ''}"><button data-cell="${p.label}|${id}" ${play ? '' : 'disabled'} aria-label="${p.label}, ${esc(nameOf(id))}: ${m ? MARK_WORD[m] : 'blank'}${implied ? ' (another choice rules it out)' : ''}">${m ? ICON[m] : ''}</button></td>`;
+      const v = m === 'yes' ? S.checked[p.label] : null; // after Check: right (tick) or wrong (square)
+      return `<td class="${m || ''}${implied ? ' implied' : ''}${v ? ' ' + v : ''}"><button data-cell="${p.label}|${id}" ${play ? '' : 'disabled'} aria-label="${p.label}, ${esc(nameOf(id))}: ${m ? MARK_WORD[m] : 'blank'}${v ? `, checked ${v}` : ''}${implied ? ' (another choice rules it out)' : ''}">${v ? ICON[v === 'right' ? 'tick' : 'square'] : m ? ICON[m] : ''}</button></td>`;
     };
     const colName = id => `<button class="colh${id === 'abn' ? ' abn' : ''}" data-colh="${id}" title="${esc(BY[id].long)}">${esc(nameOf(id))}</button>`;
-    const popHead = p => { const c = S.checked[p.label]; return `${rowTag(p)}${c ? `<span class="rowmark ${c}">${ICON[c]}<span>${c}</span></span>` : ''}`; };
+    const popHead = p => rowTag(p); // a checked row's verdict shows in its chosen cell
     if (typesAsRows()) {
       // cell types down the side (as in the reference), populations across the top
       h += `<div class="gridwrap"><table class="lgrid t"><thead><tr><th></th>${rows().map(p => `<th data-focus="${p.label}" class="${S.focus === p.slot ? 'focus' : ''}">${popHead(p)}</th>`).join('')}</tr></thead><tbody>`;

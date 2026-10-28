@@ -78,7 +78,10 @@ html.in-game, html.in-game body { background: var(--card); }
 .lgrid td.no { background: var(--sunk); }
 .lgrid td.yes { background: var(--blue-bg); }
 .lgrid td.maybe { background: var(--gold-bg); }
-.lgrid td.implied .ic { opacity: .45; } /* ruled out by a Yes in its row or column */
+.lgrid td.implied .ic { opacity: .45; }
+/* after Check, a chosen cell shows its verdict: a green tick, or a red square (shape and color both) */
+.lgrid td.yes.right { background: var(--yes-bg); }
+.lgrid td.yes.wrong { background: var(--nope-bg); } /* ruled out by a Yes in its row or column */
 /* scratchpad tap tools: symbols only (named by aria-label and title), lit with the usual segmented ring */
 .seg.tools { margin-right: auto; }
 .seg.tools button { display: inline-grid; place-items: center; min-width: 34px; min-height: 34px; padding: 0 6px; }
@@ -418,9 +421,9 @@ html.holdmode .plots figure { touch-action: pan-x; } /* the strip still swipes s
 .qmain > .btn.primary { background: var(--card); border-color: var(--card); color: var(--blue); }
 
 /* the quiz speaks in plain green (yes / right) and red (no / wrong), always with an icon and a word too */
-.quiz { --yes: #15a03c; --yes-bg: #dcf5e3; --nope: #d92b2b; --nope-bg: #fde2e2; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="default"]):not([data-theme="light"]) .quiz { --yes: #3fd46e; --yes-bg: #0f3a1d; --nope: #ff6464; --nope-bg: #431616; } }
-:root[data-theme="dark"] .quiz, :root[data-theme="black"] .quiz { --yes: #3fd46e; --yes-bg: #0f3a1d; --nope: #ff6464; --nope-bg: #431616; }
+.quiz, .lgrid { --yes: #15a03c; --yes-bg: #dcf5e3; --nope: #d92b2b; --nope-bg: #fde2e2; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="default"]):not([data-theme="light"]) :is(.quiz, .lgrid) { --yes: #3fd46e; --yes-bg: #0f3a1d; --nope: #ff6464; --nope-bg: #431616; } }
+:root[data-theme="dark"] :is(.quiz, .lgrid), :root[data-theme="black"] :is(.quiz, .lgrid) { --yes: #3fd46e; --yes-bg: #0f3a1d; --nope: #ff6464; --nope-bg: #431616; }
 .yn .btn.yes { background: var(--yes); border-color: var(--yes); color: #fff; }
 .yn .btn.no { background: var(--nope); border-color: var(--nope); color: #fff; }
 .swipe-hint.right { color: var(--yes); border: 2px solid var(--yes); }
