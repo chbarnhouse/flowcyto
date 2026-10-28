@@ -49,7 +49,7 @@
   // ---------- storage (every access guarded: private windows may refuse) ----------
   const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || 'null') || d; } catch (e) { return d; } };
   const save = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* stats/prefs just don't persist */ } };
-  const prefs = Object.assign({ enlarge: 'hold', refOpen: 'hold', gscale: 1, plotRows: 2, crossedLast: false, cellAxis: 'rows', quizRight: 3, quizWrong: 0, abbrOpen: 'hold', autoCheck: false, timer: false, tours: {}, padTool: '',
+  const prefs = Object.assign({ enlarge: 'hold', refOpen: 'hold', gscale: 1, plotRows: 2, crossedLast: false, cellAxis: 'rows', quizRight: 3, quizWrong: 0, abbrOpen: 'hold', autoCheck: false, timer: false, tours: {}, padTool: '', autoNo: true,
     custom: { pops: 4, gating: false, choose: false, decoys: true, extra: true, ref: 'filled', spread: 'normal', pct: false, scratch: true, dx: 'choice' } }, load('flowcyto.prefs', {}));
   prefs.appearance = Object.assign({ mode: 'auto', light: 'default', dark: 'dark' }, prefs.appearance || {});
   prefs.custom = Object.assign({ scratch: true, dx: 'choice' }, prefs.custom);
@@ -670,7 +670,15 @@
     if (gating()) h += `<p class="gstat">${S.gates.some(Boolean) ? `${plural(S.groups.length, 'group')}${S.extraGroups ? ` (+${S.extraGroups} too many to letter)` : ''}` : 'No gates yet: drag on a plot to place one'} · this tube has ${P.pops.length} populations</p>`;
     else h += `<p class="sub">Give every population an identity; none is used twice${S.cfg.dx ? ', and exactly one is the abnormal clone' : ''}. Pick a tool and tap once, or with no tool tap a cell to cycle: chosen, ruled out, maybe, blank. Tap a letter to highlight it in every plot.</p>`;
     if (!S.cols.length) h += `<p class="empty">Choose which cell types to consider${S.cfg.dx ? ', including Abnormal (clone)' : ''}.</p>`;
-    const cell = (p, id) => { const m = S.marks[p.label + '|' + id]; return `<td class="${m || ''}"><button data-cell="${p.label}|${id}" ${play ? '' : 'disabled'} aria-label="${p.label}, ${esc(nameOf(id))}: ${m ? MARK_WORD[m] : 'blank'}">${m ? ICON[m] : ''}</button></td>`; };
+    // a Yes rules out the rest of its row and column (one identity each, none used twice). Shown, not stored:
+    // taking the Yes away brings back whatever the cells held
+    const yesRows = new Set(), yesCols = new Set();
+    if (prefs.autoNo) for (const p of rows()) for (const id of S.cols) if (S.marks[p.label + '|' + id] === 'yes') { yesRows.add(p.label); yesCols.add(id); }
+    const cell = (p, id) => {
+      let m = S.marks[p.label + '|' + id], implied = false;
+      if (m !== 'yes' && m !== 'no' && (yesRows.has(p.label) || yesCols.has(id))) { m = 'no'; implied = true; }
+      return `<td class="${m || ''}${implied ? ' implied' : ''}"><button data-cell="${p.label}|${id}" ${play ? '' : 'disabled'} aria-label="${p.label}, ${esc(nameOf(id))}: ${m ? MARK_WORD[m] : 'blank'}${implied ? ' (another choice rules it out)' : ''}">${m ? ICON[m] : ''}</button></td>`;
+    };
     const colName = id => `<button class="colh${id === 'abn' ? ' abn' : ''}" data-colh="${id}" title="${esc(BY[id].long)}">${esc(nameOf(id))}</button>`;
     const popHead = p => { const c = S.checked[p.label]; return `${rowTag(p)}${c ? `<span class="rowmark ${c}">${ICON[c]}<span>${c}</span></span>` : ''}`; };
     if (typesAsRows()) {
@@ -802,6 +810,8 @@
     for (const e of ENTITIES) if (e.kind === 'neoplasm' && [e.name, e.long, ...(e.aliases || [])].some(n => norm(n) === v)) return e.id;
     return null;
   }
+  // a cell the grid already shows ruled out because a Yes shares its row or column (Settings → Yes rules out…)
+  const shownNo = (row, id) => prefs.autoNo && S.marks[row + '|' + id] !== 'yes' && Object.keys(S.marks).some(k => { const [r2, i2] = k.split('|'); return S.marks[k] === 'yes' && r2 !== 'dx' && (r2 === row || i2 === id); });
   /* Auto-check: judge one row the moment an identity is chosen. */
   function autoCheckRow(row) {
     const r = rows().find(q => q.label === row), id = S.cols.find(i => S.marks[row + '|' + i] === 'yes');
@@ -943,7 +953,7 @@
     for (const { p, r, key, sol } of list) {
       if (S.marks[key(sol)] === 'yes') continue;
       for (const id of S.cols) {
-        if (S.marks[key(id)] === 'no' || S.marks[key(id)] === 'yes' || fits(id, p, mks)) continue;
+        if (S.marks[key(id)] === 'no' || S.marks[key(id)] === 'yes' || shownNo(r.label, id) || fits(id, p, mks)) continue;
         const c = firstContradiction(id, p);
         S.marks[key(id)] = 'no';
         return say(`${rowTag(r)} is not ${esc(nameOf(id))}: ${esc(c.text)}. Crossed it out.`, r, c.plot);
@@ -1315,6 +1325,7 @@
       h += `<div class="set-row"><div><b>Enlarge a plot</b><span>Press and hold shows it while your finger is down; tap opens it until you tap again. On gated levels a tap always opens it, so you can place its gate.</span></div>${seg('enlarge', [['hold', 'Press and hold'], ['tap', 'Tap']])}</div>`;
       h += `<div class="set-row"><div><b>Open the reference</b><span>For the read-only reference. When you fill it in yourself it always opens on a tap.</span></div>${seg('refOpen', [['hold', 'Press and hold'], ['tap', 'Tap']])}</div>`;
       h += `<div class="set-row"><div><b>Timer</b><span>Shows the clock while you play and your best time per level. Times are kept either way.</span></div>${seg('timer', [[false, 'Off'], [true, 'On']])}</div>`;
+      h += `<div class="set-row"><div><b>Yes rules out its row and column</b><span>Choosing an identity crosses out the rest of its row and column, since each population has one identity and none is used twice. Take the choice away and those cells go back to what they were.</span></div>${seg('autoNo', [[true, 'On'], [false, 'Off']])}</div>`;
       h += `<div class="set-row"><div><b>Auto-check</b><span>Marks each choice right or wrong as you make it. A wrong choice counts as a mistake.</span></div>${seg('autoCheck', [[false, 'Off'], [true, 'On']])}</div>`;
     }
     if (S) {
@@ -1351,7 +1362,7 @@
     const b = ev.target.closest('[data-pref]');
     if (b) {
       const k = b.dataset.pref, raw = b.dataset.v;
-      const v = (k === 'autoCheck' || k === 'timer' || k === 'crossedLast') ? raw === 'true' : ['gscale', 'plotRows', 'quizRight', 'quizWrong'].includes(k) ? +raw : raw;
+      const v = (k === 'autoCheck' || k === 'timer' || k === 'crossedLast' || k === 'autoNo') ? raw === 'true' : ['gscale', 'plotRows', 'quizRight', 'quizWrong'].includes(k) ? +raw : raw;
       setPref(k, v); applyTheme();
       if (S) { if (k === 'crossedLast') drawPlots(); drawPanel(); tickTimer(); if (refIsOpen()) drawRef(); } else if ($('#quiz').hidden) showMenu();
       return openSettings();

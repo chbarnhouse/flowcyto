@@ -78,6 +78,7 @@ html.in-game, html.in-game body { background: var(--card); }
 .lgrid td.no { background: var(--sunk); }
 .lgrid td.yes { background: var(--blue-bg); }
 .lgrid td.maybe { background: var(--gold-bg); }
+.lgrid td.implied .ic { opacity: .45; } /* ruled out by a Yes in its row or column */
 /* scratchpad tap tools: symbols only (named by aria-label and title), lit with the usual segmented ring */
 .seg.tools { margin-right: auto; }
 .seg.tools button { display: inline-grid; place-items: center; min-width: 34px; min-height: 34px; padding: 0 6px; }
