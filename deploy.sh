@@ -23,7 +23,7 @@ echo "==> Checking every board still has one answer"
 node tools/check.js 60 >/dev/null || { echo "!! deploy stopped: tools/check.js failed" >&2; exit 1; }
 
 echo "==> Packing"
-COPYFILE_DISABLE=1 tar czf "$STAGE/flowcyto.tgz" --no-xattrs index.html style.css game.css favicon.svg apple-touch-icon.png manifest.webmanifest icons js
+COPYFILE_DISABLE=1 tar czf "$STAGE/flowcyto.tgz" --no-xattrs index.html style.css game.css favicon.svg apple-touch-icon.png manifest.webmanifest icons js serve.py
 $SCP -q "$STAGE/flowcyto.tgz" "$PVE_HOST:/tmp/flowcyto.tgz"
 
 echo "==> Installing into CT $CTID:$APPDIR"
@@ -31,8 +31,8 @@ $SSH "$PVE_HOST" bash -s -- "$CTID" "$APPDIR" "$PORT" "${1:-}" <<'REMOTE'
 set -euo pipefail
 CTID="$1"; APPDIR="$2"; PORT="$3"; MODE="${4:-}"
 pct push "$CTID" /tmp/flowcyto.tgz /tmp/flowcyto.tgz
-if [[ "$MODE" == "--setup" ]]; then
-  pct exec "$CTID" -- bash -c "
+# the unit is rewritten every run, so changes to it (serve.py, 2026-10-28) reach the server; --setup also enables it
+pct exec "$CTID" -- bash -c "
     id flowcyto >/dev/null 2>&1 || useradd --system --home $APPDIR --shell /usr/sbin/nologin flowcyto
     mkdir -p $APPDIR/app
     cat > /etc/systemd/system/flowcyto.service <<UNIT
@@ -42,16 +42,15 @@ After=network.target
 
 [Service]
 User=flowcyto
-ExecStart=/usr/bin/python3 -m http.server $PORT --bind 0.0.0.0 --directory $APPDIR/app
+ExecStart=/usr/bin/python3 $APPDIR/app/serve.py $PORT $APPDIR/app
 Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
 UNIT
     systemctl daemon-reload
-    systemctl enable flowcyto
+    [[ \"$MODE\" == \"--setup\" ]] && systemctl enable flowcyto || true
   "
-fi
 # Unpack beside the live files and swap, so a failed extract never leaves it half-replaced.
 pct exec "$CTID" -- bash -c "
   set -e
