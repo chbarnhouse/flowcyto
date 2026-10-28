@@ -142,13 +142,15 @@
   const markerCells = mk => ENTITIES.filter(e => carries(e.m[mk])).map(e => ({ kind: 'cell', key: e.id, lv: e.m[mk], group: e.kind === 'normal' ? 'Normal' : 'Abnormal' }));
   // one answer list as a small table: name · full name · how it reads (in words), the asked one shaded and tagged
   function sectionHTML(title, items, hit, foot, hitTag = 'asked') {
-    let group = null;
-    const rows = items.map(it => {
+    // grouped lists (Normal / Abnormal) get a table each, so wide windows can set them side by side
+    const groups = [];
+    for (const it of items) { if (!groups.length || it.group !== groups[groups.length - 1].name) groups.push({ name: it.group, items: [] }); groups[groups.length - 1].items.push(it); }
+    const table = g => `<table class="qtab ${g.items[0].kind}">${g.name ? `<tr class="grp"><th colspan="3">${g.name}</th></tr>` : ''}${g.items.map(it => {
       const f = spelled(it.kind, it.key), tag = TAG[it.lv], asked = it.key === hit;
-      const head = it.group && it.group !== group ? `<tr class="grp"><th colspan="3">${(group = it.group)}</th></tr>` : '';
-      return `${head}<tr${asked ? ' class="hit"' : ''}><th>${esc(nameOf(it.kind, it.key))}</th><td>${esc(f)}</td><td class="lv">${tag ? `<span class="pill">${tag}</span>` : ''}${asked ? `<span class="pill asked">${hitTag}</span>` : ''}</td></tr>`;
-    }).join('');
-    return `<section class="qsec"><h4>${title}</h4>${items.length ? `<table class="qtab ${items[0].kind}">${rows}</table>` : '<p class="help">None of these cell types.</p>'}${foot ? `<p class="qfoot">${foot}</p>` : ''}</section>`;
+      return `<tr${asked ? ' class="hit"' : ''}><th>${esc(nameOf(it.kind, it.key))}</th><td>${esc(f)}</td><td class="lv">${tag ? `<span class="pill">${tag}</span>` : ''}${asked ? `<span class="pill asked">${hitTag}</span>` : ''}</td></tr>`;
+    }).join('')}</table>`;
+    const lists = !items.length ? '<p class="help">None of these cell types.</p>' : groups.length > 1 ? `<div class="qgroups">${groups.map(table).join('')}</div>` : table(groups[0]);
+    return `<section class="qsec${groups.length > 1 ? ' grouped' : ''}"><h4>${title}</h4>${lists}${foot ? `<p class="qfoot">${foot}</p>` : ''}</section>`;
   }
   // "CLL / SLL (chronic lymphocytic leukemia / …)"; a full name with its own parentheses goes between commas
   const withFull = (kind, key) => {
@@ -245,7 +247,7 @@
     else { line = `${withFull('cell', q.id).replace(/,$/, '')} carries <b>${q.correct.map(o => esc(MARKERS[o].name)).join(', ')}</b>`; body = onCell(q.id, teach); }
     // auto-continue: a bar that runs down to the next question; press and hold (or scroll the answer) stops it
     const a = Q.auto, timer = a ? `<div class="qtimer${a.paused ? ' paused' : ''}" style="--secs:${a.secs}s"><div class="qtimer-track"><i></i></div><span>${a.paused ? `${ICON.pause}<b>Paused</b> · Next when you're ready` : `Next question in <span class="qcount">${a.secs}</span> s · <b>hold to pause</b>`}</span></div>` : '';
-    return `<div class="qpop ${Q.right ? 'right' : 'wrong'}" role="status"><div class="qpop-in card${q.kind === 'match' ? ' wide' : ''}"><div class="qpop-head">${Q.right ? ICON.yes : ICON.no}<b>${Q.right ? 'Right' : 'Not quite'}</b></div><div class="qpop-body"><p class="qpop-line">${line}</p>${body}</div>${timer}<button class="btn big qpop-next" data-qnext>Next</button></div></div>`;
+    return `<div class="qpop ${Q.right ? 'right' : 'wrong'}" role="status"><div class="qpop-in card${q.kind === 'match' ? ' wide two' : body.includes('qgroups') ? ' wide' : ''}"><div class="qpop-head">${Q.right ? ICON.yes : ICON.no}<b>${Q.right ? 'Right' : 'Not quite'}</b></div><div class="qpop-body"><p class="qpop-line">${line}</p>${body}</div>${timer}<button class="btn big qpop-next" data-qnext>Next</button></div></div>`;
   }
   function draw() {
     hideFull();

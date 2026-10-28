@@ -549,9 +549,19 @@ html, body { touch-action: manipulation; }
 .qtab tr + tr.grp > * { border-top: 0; }
 .qsecs { display: flex; flex-direction: column; gap: 8px; }
 /* wide windows: the cell's markers on the left, the marker's cells on the right */
+/* grouped lists: one table per group; stacked by default */
+.qgroups { display: flex; flex-direction: column; }
 @media (min-width: 760px) {
   .qpop-in.wide { width: min(100%, 980px); }
-  .qsecs.two { display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: 12px; }
+  .qsecs.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 12px; }
+  /* one list alone: Normal and Abnormal side by side */
+  .qpop-in.wide:not(.two) .qgroups { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 20px; align-items: start; }
+}
+/* big windows: the cells list takes two columns of its own, so the card spans the screen */
+@media (min-width: 1200px) {
+  .qpop-in.wide.two { width: min(100%, 1480px); }
+  .qsecs.two { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
+  .qsecs.two .qgroups { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 20px; align-items: start; }
 }
 /* small phones: tighter popup, so the lists get the room */
 @media (max-width: 380px), (max-height: 700px) {
