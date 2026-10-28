@@ -1,8 +1,12 @@
-/* FlowCyto Markers: an endless quiz on which cells carry which markers. Three kinds of question, each
-   switched on or off on the start sheet:
-     match   a cell type and a marker: does it carry it? (swipe right for yes, left for no; or the buttons)
-     cells   a marker: which of these cells carry it? (pick all that apply)
-     markers a cell type: which of these markers does it carry? (pick all that apply)
+/* FlowCyto Markers: an endless quiz on which cells carry which markers. Answer formats, any mix of them
+   switched on in Settings (at least one):
+     swipe   a cell type and a marker: does it carry it? (swipe right for yes, left for no; or the buttons)
+     single  multiple choice with one right answer (tapping a choice answers)
+     multi   pick all that apply (one to three right)
+     type    type it yourself: a full name or an abbreviation, matched the way Step 1 Pathways matches
+             (case, spaces and punctuation ignored, Greek folded); any right answer counts, and text that
+             names nothing isn't a miss
+   Directions (for all but swipe; at least one): marker → cells, cell → markers.
    Only clear-cut readings are asked: a marker that is partly positive or varies between patients is
    never a question. Negative pairs come from the same lineage's markers (CD5 on a B cell, not CD41 on a
    T cell), so a "no" is a real distinction. Route: '#markers'. */
@@ -23,7 +27,10 @@
     pause: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 3.5v9M10.5 3.5v9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>',
     gear: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h6M12 4.5h1.5M2.5 11.5h1.5M7.5 11.5h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="10.2" cy="4.5" r="1.7" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="5.8" cy="11.5" r="1.7" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>',
   };
-  const KINDS = { match: 'Does it carry it? (swipe)', cells: 'Marker → which cells', markers: 'Cell → which markers' };
+  const FORMATS = { swipe: 'Swipe: does this cell carry this marker? Right for yes, left for no', single: 'Multiple choice: one right answer', multi: 'Pick all that apply: more than one can be right', type: 'Type it yourself: any right answer counts' };
+  const DIRS = { cells: 'Marker → cells', markers: 'Cell → markers' };
+  // almost every cell has these: never the answer to type
+  const COMMON = ['CD45', 'CD55', 'CD59'];
 
   // ---------- facts: clear-cut readings only ----------
   const QUIZ_MARKERS = Object.keys(MARKERS).filter(mk => !['FSC', 'SSC', 'LC'].includes(mk));
@@ -44,38 +51,74 @@
   const cellPool = () => ENTITIES.filter(e => Q.cfg.cells === 'both' || e.kind === Q.cfg.cells).map(e => e.id);
 
   function makeQuestion() {
-    // pick the kind first, then retry within it, so a kind that is harder to fill still gets its share
-    const kinds = shuffle(Object.keys(KINDS).filter(k => Q.cfg.kinds[k]));
-    for (let tries = 0; tries < 50 * kinds.length; tries++) {
-      const kind = kinds[Math.floor(tries / 50)], pool = cellPool();
-      if (kind === 'match') {
+    // pick the format first, then retry within it, so a format that is harder to fill still gets its share
+    const fmts = shuffle(Object.keys(FORMATS).filter(f => Q.cfg.formats[f]));
+    const dirs = Object.keys(DIRS).filter(d => Q.cfg.dirs[d]);
+    for (let tries = 0; tries < 50 * fmts.length; tries++) {
+      const fmt = fmts[Math.floor(tries / 50)], pool = cellPool();
+      if (fmt === 'swipe') {
         const id = pick(pool), mks = markersFor(id).filter(mk => !named(id, mk)), want = Math.random() < 0.5;
         const pickFrom = mks.filter(mk => reading(id, mk) === want);
         if (!pickFrom.length) continue;
-        const mk = pick(pickFrom);
-        return { kind, id, mk, answer: want };
+        return { kind: 'match', fmt, id, mk: pick(pickFrom), answer: want };
       }
+      const kind = pick(dirs);
+      if (fmt === 'type') {
+        if (kind === 'markers') {
+          const id = pick(pool), ok = markersFor(id).filter(mk => reading(id, mk) && !named(id, mk) && !COMMON.includes(mk));
+          if (!ok.length) continue;
+          return { kind, fmt, id, correct: ok };
+        }
+        // a marker few cells carry, so naming one means something
+        const mk = pick(QUIZ_MARKERS.filter(m => !COMMON.includes(m))), ok = pool.filter(id => reading(id, mk) === true);
+        if (!ok.length || ok.length > 6 || ENTITIES.some(e => carries(e.m[mk]) && named(e.id, mk))) continue;
+        return { kind, fmt, mk, correct: ok };
+      }
+      const one = fmt === 'single', total = one ? 4 : 5;
+      const nPosOf = pos => one ? 1 : Math.min(pos.length, 1 + Math.floor(Math.random() * 3));
       if (kind === 'markers') {
         const id = pick(pool), mks = shuffle(markersFor(id).filter(mk => !named(id, mk)));
         const pos = mks.filter(mk => reading(id, mk)), neg = mks.filter(mk => !reading(id, mk));
-        if (!pos.length || !neg.length) continue;
-        const nPos = Math.min(pos.length, 1 + Math.floor(Math.random() * 3)), opts = shuffle([...pos.slice(0, nPos), ...neg.slice(0, 5 - nPos)]);
-        if (opts.length < 4) continue;
-        return { kind, id, options: opts, correct: opts.filter(mk => reading(id, mk)) };
+        if (!pos.length || neg.length < total - nPosOf(pos)) continue;
+        const nPos = nPosOf(pos), opts = shuffle([...pos.slice(0, nPos), ...neg.slice(0, total - nPos)]);
+        return { kind, fmt, id, options: opts, correct: opts.filter(mk => reading(id, mk)) };
       }
-      if (kind === 'cells') {
-        const mk = pick(QUIZ_MARKERS), clear = shuffle(pool.filter(id => reading(id, mk) !== null && markersFor(id).includes(mk) && !named(id, mk)));
-        const pos = clear.filter(id => reading(id, mk)), neg = clear.filter(id => !reading(id, mk));
-        if (!pos.length || neg.length < 2) continue;
-        // decoys from the positives' lineages first, so the choice is a real one
-        const lins = new Set(pos.map(id => BY[id].lineage));
-        const negs = [...neg.filter(id => lins.has(BY[id].lineage)), ...neg.filter(id => !lins.has(BY[id].lineage))];
-        const nPos = Math.min(pos.length, 1 + Math.floor(Math.random() * 3)), opts = shuffle([...pos.slice(0, nPos), ...negs.slice(0, 5 - nPos)]);
-        if (opts.length < 4) continue;
-        return { kind, mk, options: opts, correct: opts.filter(id => reading(id, mk)) };
-      }
+      const mk = pick(QUIZ_MARKERS), clear = shuffle(pool.filter(id => reading(id, mk) !== null && markersFor(id).includes(mk) && !named(id, mk)));
+      const pos = clear.filter(id => reading(id, mk)), neg = clear.filter(id => !reading(id, mk));
+      if (!pos.length || neg.length < 3) continue;
+      // decoys from the positives' lineages first, so the choice is a real one
+      const lins = new Set(pos.map(id => BY[id].lineage));
+      const negs = [...neg.filter(id => lins.has(BY[id].lineage)), ...neg.filter(id => !lins.has(BY[id].lineage))];
+      const nPos = nPosOf(pos), opts = shuffle([...pos.slice(0, nPos), ...negs.slice(0, total - nPos)]);
+      if (opts.length < 4) continue;
+      return { kind, fmt, mk, options: opts, correct: opts.filter(id => reading(id, mk)) };
     }
     return null;
+  }
+
+  // ---------- typed answers: every name a cell or marker goes by ----------
+  // Step 1 Pathways' rule: case, spaces and punctuation don't matter; Greek letters fold to their Latin initial
+  const GREEK = { α: 'a', β: 'b', γ: 'g', δ: 'd', ε: 'e', κ: 'k', λ: 'l' };
+  const tnorm = s => String(s).toLowerCase().replace(/[αβγδεκλ]/g, c => GREEK[c]).replace(/\b(alpha|beta|gamma|delta|kappa|lambda)/g, w => w[0])
+    .normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+  function namesOf(kind, key) {
+    if (kind === 'cell') { const e = BY[key]; return [e.name, e.long, ...(e.aliases || []), ...e.name.split(' / ')]; }
+    const m = MARKERS[key], out = [key, m.name];
+    // "c-KIT, the stem cell factor receptor", "neural cell adhesion molecule (NCAM)": each part counts
+    if (m.full) out.push(m.full, ...m.full.split(/[(),]/).map(x => x.replace(/^\s*the\s+/, '').trim()).filter(x => x.length > 1));
+    return out;
+  }
+  const INDEX = { cell: new Map(), mark: new Map() };
+  for (const e of ENTITIES) for (const n of namesOf('cell', e.id)) if (tnorm(n)) INDEX.cell.set(tnorm(n), e.id);
+  for (const mk of QUIZ_MARKERS) for (const n of namesOf('mark', mk)) if (tnorm(n) && !INDEX.mark.has(tnorm(n))) INDEX.mark.set(tnorm(n), mk);
+  const resolve = (kind, text) => INDEX[kind].get(tnorm(text)) || null;
+  // a near miss in spelling: suggest the name (never the answer: it is any name in the catalog)
+  function nearest(kind, text) {
+    const v = tnorm(text); if (v.length < 4) return null;
+    const dist = (a, b) => { const d = Array.from({ length: b.length + 1 }, (_, j) => j); for (let i = 1; i <= a.length; i++) { let prev = d[0]; d[0] = i; for (let j = 1; j <= b.length; j++) { const t = d[j]; d[j] = Math.min(d[j] + 1, d[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = t; } } return d[b.length]; };
+    let best = null;
+    for (const [n, key] of INDEX[kind]) { const k = dist(v, n); if (k <= (v.length > 8 ? 2 : 1) && (!best || k < best[0])) best = [k, key]; }
+    return best && nameOf(kind, best[1]);
   }
 
   // ---------- full names ----------
@@ -98,12 +141,12 @@
   // every cell in the catalog, whatever the quiz is set to; normal ones first, under their own headings
   const markerCells = mk => ENTITIES.filter(e => carries(e.m[mk])).map(e => ({ kind: 'cell', key: e.id, lv: e.m[mk], group: e.kind === 'normal' ? 'Normal' : 'Abnormal' }));
   // one answer list as a small table: name · full name · how it reads (in words), the asked one shaded and tagged
-  function sectionHTML(title, items, hit, foot) {
+  function sectionHTML(title, items, hit, foot, hitTag = 'asked') {
     let group = null;
     const rows = items.map(it => {
       const f = spelled(it.kind, it.key), tag = TAG[it.lv], asked = it.key === hit;
       const head = it.group && it.group !== group ? `<tr class="grp"><th colspan="3">${(group = it.group)}</th></tr>` : '';
-      return `${head}<tr${asked ? ' class="hit"' : ''}><th>${esc(nameOf(it.kind, it.key))}</th><td>${esc(f)}</td><td class="lv">${tag ? `<span class="pill">${tag}</span>` : ''}${asked ? '<span class="pill asked">asked</span>' : ''}</td></tr>`;
+      return `${head}<tr${asked ? ' class="hit"' : ''}><th>${esc(nameOf(it.kind, it.key))}</th><td>${esc(f)}</td><td class="lv">${tag ? `<span class="pill">${tag}</span>` : ''}${asked ? `<span class="pill asked">${hitTag}</span>` : ''}</td></tr>`;
     }).join('');
     return `<section class="qsec"><h4>${title}</h4>${items.length ? `<table class="qtab ${items[0].kind}">${rows}</table>` : '<p class="help">None of these cell types.</p>'}${foot ? `<p class="qfoot">${foot}</p>` : ''}</section>`;
   }
@@ -115,7 +158,15 @@
   };
 
   // ---------- state ----------
-  const Q = { cfg: Object.assign({ kinds: { match: true, cells: true, markers: true }, cells: 'both' }, load('flowcyto.markers', {})), q: null, picked: new Set(), crossed: new Set(), done: false, right: null, score: 0, answered: 0, streak: 0 };
+  // settings from before formats existed: swipe stays swipe, the two pick-all kinds become Pick all + their directions
+  const savedCfg = load('flowcyto.markers', {});
+  if (savedCfg.kinds && !savedCfg.formats) {
+    const k = savedCfg.kinds;
+    savedCfg.formats = { swipe: !!k.match, single: false, multi: !!(k.cells || k.markers), type: false };
+    savedCfg.dirs = k.cells || k.markers ? { cells: !!k.cells, markers: !!k.markers } : { cells: true, markers: true };
+    delete savedCfg.kinds;
+  }
+  const Q = { cfg: Object.assign({ formats: { swipe: true, single: true, multi: true, type: false }, dirs: { cells: true, markers: true }, cells: 'both' }, savedCfg), draft: '', msg: null, typed: null, q: null, picked: new Set(), crossed: new Set(), done: false, right: null, score: 0, answered: 0, streak: 0 };
   const best = () => load('flowcyto.markersBest', 0);
 
   // ---------- views ----------
@@ -129,21 +180,20 @@
   function close() { $('#quiz').hidden = true; hideFull(); }
   const bar = () => `<header class="bar"><div class="bar-in"><button class="iconbtn" data-qmenu aria-label="Main menu">${ICON.back}<span>Menu</span></button><div class="gtitle"><b>Markers</b><span>${Q.answered ? `${Q.score} of ${Q.answered} · streak ${Q.streak} · best ${best()}` : `best streak ${best()}`}</span></div><span class="bar-btns"><button class="iconbtn" data-qmaster aria-label="Master reference">${FC.master.ICON}<span>Reference</span></button><button class="iconbtn" data-qsettings aria-label="Settings">${ICON.gear}<span>Settings</span></button></span></div></header>`;
   // the quiz's own settings: shown on the start screen and at the top of Settings
-  function kindsHTML() {
-    const c = Q.cfg, chip = (k, label) => `<button class="qchip" data-qkind="${k}" aria-pressed="${!!c.kinds[k]}">${c.kinds[k] ? ICON.yes : '<span class="ic"></span>'}<span>${label}</span></button>`;
-    return `<div class="qchips">${chip('match', 'Does this cell carry this marker? Swipe right for yes, left for no')}${chip('cells', 'A marker: pick every cell that carries it')}${chip('markers', 'A cell: pick every marker it carries')}</div>`;
-  }
+  const chipOf = (attr, on, label) => `<button class="qchip" ${attr} aria-pressed="${on}">${on ? ICON.yes : '<span class="ic"></span>'}<span>${label}</span></button>`;
+  const kindsHTML = () => `<div class="qchips">${Object.entries(FORMATS).map(([k, t]) => chipOf(`data-qfmt="${k}"`, !!Q.cfg.formats[k], t)).join('')}</div>`;
+  const dirsHTML = () => `<div class="qchips">${Object.entries(DIRS).map(([k, t]) => chipOf(`data-qdir="${k}"`, !!Q.cfg.dirs[k], t)).join('')}</div>`;
   // which cells the questions (and the answer lists) draw on
   const cellsHTML = () => `<div class="seg" role="radiogroup">${[['normal', 'Normal'], ['neoplasm', 'Abnormal'], ['both', 'Both']].map(([v, t]) => `<button role="radio" data-qcells="${v}" aria-checked="${Q.cfg.cells === v}">${t}</button>`).join('')}</div>`;
-  const modeHTML = () => `${kindsHTML()}<div class="qrow"><div><b>Cell types</b><span>Normal cells, abnormal ones (neoplasms and clones), or both.</span></div>${cellsHTML()}</div>`;
+  const modeHTML = () => `${kindsHTML()}<div class="qrow"><div><b>Directions</b><span>For every format but swipe: name the cells for a marker, the markers for a cell, or both.</span></div>${dirsHTML()}</div><div class="qrow"><div><b>Cell types</b><span>Normal cells, abnormal ones (neoplasms and clones), or both.</span></div>${cellsHTML()}</div>`;
   function setup() {
     Q.q = null;
-    $('#quiz').innerHTML = bar() + `<main class="qmain"><section class="qcard setup card"><h2>Markers</h2><p class="sub">An endless quiz on which cells carry which markers. Pick the kinds of question; change them any time in Settings.</p>
+    $('#quiz').innerHTML = bar() + `<main class="qmain"><section class="qcard setup card"><h2>Markers</h2><p class="sub">An endless quiz on which cells carry which markers. Pick any mix of answer formats; change them any time in Settings.</p>
       ${modeHTML()}<button class="btn primary big" data-qstart>Start</button></section></main>`;
   }
   function next() {
     if (Q.auto) { clearTimeout(Q.auto.timer); clearInterval(Q.auto.tick); } Q.auto = null;
-    Q.q = makeQuestion(); Q.picked = new Set(); Q.crossed = new Set(); Q.done = false; Q.right = null;
+    Q.q = makeQuestion(); Q.picked = new Set(); Q.crossed = new Set(); Q.done = false; Q.right = null; Q.draft = ''; Q.msg = null; Q.typed = null;
     if (!Q.q) { $('#quiz').innerHTML = bar() + '<main class="qmain"><section class="qcard card"><p>No questions fit these settings. Try more cell types.</p></section></main>'; return; }
     draw();
   }
@@ -156,8 +206,16 @@
       if (!fb) h += `<div class="yn"><button class="btn big no" data-yn="no">${ICON.no}<span>No</span></button><button class="btn big yes" data-yn="yes">${ICON.yes}<span>Yes</span></button></div>`;
       return h;
     }
-    const isCells = q.kind === 'cells';
-    let h = `<section class="qcard card"><span class="qkind">${isCells ? 'Which cells carry it?' : 'Which markers does it carry?'} Pick all that apply.</span><b class="qbig">${isCells ? term('mark', q.mk) : term('cell', q.id)}</b><div class="qopts">`;
+    const isCells = q.kind === 'cells', subj = isCells ? term('mark', q.mk) : term('cell', q.id);
+    if (q.fmt === 'type') {
+      const ask = isCells ? 'Name a cell that carries it.' : 'Name a marker it carries.';
+      const note = isCells ? '' : ' (Not CD45, CD55 or CD59: nearly every cell has those.)';
+      return `<section class="qcard card"><span class="qkind">${ask}</span><b class="qbig">${subj}</b><p class="help">Any one counts.${note} A full name or an abbreviation; case, spaces and punctuation don't matter.</p>
+        <form class="qtype" data-qtype><input id="qin" type="text" value="${esc(fb ? nameOf(isCells ? 'cell' : 'mark', Q.typed) : Q.draft)}" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="${isCells ? 'A cell type' : 'A marker'}" aria-label="${ask}" ${fb ? 'disabled' : ''}>${fb ? '' : '<button class="btn primary big">Check</button>'}</form>
+        ${Q.msg ? `<p class="qmsg" role="status">${Q.msg}</p>` : ''}</section>`;
+    }
+    const one = q.fmt === 'single';
+    let h = `<section class="qcard card"><span class="qkind">${isCells ? (one ? 'Which cell carries it?' : 'Which cells carry it?') : (one ? 'Which marker does it carry?' : 'Which markers does it carry?')} ${one ? 'Pick one.' : 'Pick all that apply.'}</span><b class="qbig">${subj}</b><div class="qopts">`;
     for (const o of q.options) {
       const on = Q.picked.has(o), isRight = q.correct.includes(o);
       const x = !fb && Q.crossed.has(o);
@@ -168,7 +226,8 @@
       h += `<div class="qrow-opt"><button class="qopt ${cls}" data-qopt="${o}" ${hasFull ? `data-full="${ok}:${esc(o)}"` : ''} ${fb ? 'disabled' : ''}>${mark}<span${hasFull ? ' class="abbr"' : ''}>${nm}</span>${tail}</button>${fb ? '' : `<button class="xout" data-qx="${o}" aria-pressed="${x}" aria-label="${x ? 'Restore' : 'Cross out'} ${nm}" title="${x ? 'Restore' : 'Cross out'}">${ICON.no}</button>`}</div>`;
     }
     h += '</div>';
-    if (!fb) h += `<button class="btn primary big" data-qcheck ${Q.picked.size ? '' : 'disabled'}>Check</button>`;
+    // one answer: tapping a choice answers; pick all: Check
+    if (!fb && !one) h += `<button class="btn primary big" data-qcheck ${Q.picked.size ? '' : 'disabled'}>Check</button>`;
     return h + '</section>';
   }
   // the verdict pops up over the bottom of the screen; the question stays visible above it
@@ -176,20 +235,23 @@
     const q = Q.q, mk = q.mk && MARKERS[q.mk];
     const note = mk && mk.note ? `<b>${esc(mk.name)}</b>: ${esc(mk.note)}` : '';
     const teach = q.id && BY[q.id].teach ? esc(BY[q.id].teach) : '';
-    const onCell = (id, foot) => sectionHTML(`${esc(BY[id].name)} carries`, cellMarkers(id), q.mk, foot);
-    const withMark = (m, foot) => sectionHTML(`Cells with ${esc(MARKERS[m].name)}`, markerCells(m), q.id, foot);
+    const onCell = (id, foot, hit) => sectionHTML(`${esc(BY[id].name)} carries`, cellMarkers(id), hit || q.mk, foot, hit ? 'yours' : 'asked');
+    const withMark = (m, foot, hit) => sectionHTML(`Cells with ${esc(MARKERS[m].name)}`, markerCells(m), hit || q.id, foot, hit ? 'yours' : 'asked');
     let line, body;
     if (q.kind === 'match') { line = `${withFull('cell', q.id)} is <b>${esc(mk.name)}${q.answer ? '+' : '−'}</b>`; body = `<div class="qsecs two">${onCell(q.id, teach)}${withMark(q.mk, note)}</div>`; }
+    else if (q.fmt === 'type' && q.kind === 'cells') { line = `${withFull('cell', Q.typed).replace(/,$/, '')} ${Q.right ? 'carries' : "doesn't carry"} <b>${esc(mk.name)}</b>`; body = withMark(q.mk, note, Q.typed); }
+    else if (q.fmt === 'type') { line = `${withFull('cell', q.id).replace(/,$/, '')} ${Q.right ? 'carries' : "doesn't carry"} ${withFull('mark', Q.typed).replace(/,$/, '')}`; body = onCell(q.id, teach, Q.typed); }
     else if (q.kind === 'cells') { line = `Carry ${withFull('mark', q.mk).replace(/,$/, '')}: <b>${q.correct.map(o => esc(BY[o].name)).join(', ')}</b>`; body = withMark(q.mk, note); }
     else { line = `${withFull('cell', q.id).replace(/,$/, '')} carries <b>${q.correct.map(o => esc(MARKERS[o].name)).join(', ')}</b>`; body = onCell(q.id, teach); }
     // auto-continue: a bar that runs down to the next question; press and hold (or scroll the answer) stops it
-    const a = Q.auto, timer = a ? `<div class="qtimer${a.paused ? ' paused' : ''}" style="--secs:${a.secs}s"><div class="qtimer-track"><i></i></div><span>${a.paused ? `${ICON.pause}<b>Paused</b> · Next when you're ready` : `Next question in <span class="qsecs">${a.secs}</span> s · <b>hold to pause</b>`}</span></div>` : '';
+    const a = Q.auto, timer = a ? `<div class="qtimer${a.paused ? ' paused' : ''}" style="--secs:${a.secs}s"><div class="qtimer-track"><i></i></div><span>${a.paused ? `${ICON.pause}<b>Paused</b> · Next when you're ready` : `Next question in <span class="qcount">${a.secs}</span> s · <b>hold to pause</b>`}</span></div>` : '';
     return `<div class="qpop ${Q.right ? 'right' : 'wrong'}" role="status"><div class="qpop-in card${q.kind === 'match' ? ' wide' : ''}"><div class="qpop-head">${Q.right ? ICON.yes : ICON.no}<b>${Q.right ? 'Right' : 'Not quite'}</b></div><div class="qpop-body"><p class="qpop-line">${line}</p>${body}</div>${timer}<button class="btn big qpop-next" data-qnext>Next</button></div></div>`;
   }
   function draw() {
     hideFull();
     $('#quiz').innerHTML = bar() + `<main class="qmain">${questionHTML()}</main>${Q.done ? popupHTML() : ''}`;
     if (Q.q.kind === 'match' && !Q.done) bindSwipe();
+    if (Q.q.fmt === 'type' && !Q.done && !Q.msg) { const i = $('#qin'); if (i) i.focus({ preventScroll: true }); }
   }
   function answer(right) {
     Q.done = true; Q.right = right; Q.answered++;
@@ -201,7 +263,7 @@
     // the seconds count down with the bar
     const a = Q.auto;
     if (a) a.tick = setInterval(() => {
-      const el = $('#quiz .qsecs');
+      const el = $('#quiz .qcount');
       if (Q.auto !== a || a.paused || !el) return clearInterval(a.tick);
       el.textContent = Math.max(1, Math.ceil((a.end - performance.now()) / 1000));
     }, 200);
@@ -325,9 +387,12 @@
   // ---------- input ----------
   document.addEventListener('click', ev => {
     const inSettings = ev.target.closest('#settings');
-    const k = ev.target.closest('[data-qkind]'), c = ev.target.closest('[data-qcells]');
-    if (k || c) {
-      if (k) { const kinds = Q.cfg.kinds, key = k.dataset.qkind; if (kinds[key] && Object.values(kinds).filter(Boolean).length === 1) return; kinds[key] = !kinds[key]; }
+    const f = ev.target.closest('[data-qfmt]'), d = ev.target.closest('[data-qdir]'), c = ev.target.closest('[data-qcells]');
+    if (f || d || c) {
+      // flip a format or direction, but never the last one on
+      const flip = (set, key) => { if (set[key] && Object.values(set).filter(Boolean).length === 1) return false; set[key] = !set[key]; return true; };
+      if (f) { if (!flip(Q.cfg.formats, f.dataset.qfmt)) return; }
+      else if (d) { if (!flip(Q.cfg.dirs, d.dataset.qdir)) return; }
       else Q.cfg.cells = c.dataset.qcells;
       save('flowcyto.markers', Q.cfg);
       if (!$('#quiz').hidden && !Q.q) setup();
@@ -342,14 +407,31 @@
     if (ev.target.closest('[data-qnext]')) return next();
     const yn = ev.target.closest('[data-yn]'); if (yn && !Q.done) return answer((yn.dataset.yn === 'yes') === Q.q.answer);
     const x = ev.target.closest('[data-qx]'); if (x && !Q.done) { const v = x.dataset.qx; Q.crossed.has(v) ? Q.crossed.delete(v) : (Q.crossed.add(v), Q.picked.delete(v)); return draw(); }
+    const o1 = ev.target.closest('[data-qopt]');
+    if (o1 && !Q.done && Q.q.fmt === 'single') { const v = o1.dataset.qopt; Q.picked = new Set([v]); return answer(Q.q.correct.includes(v)); }
     const o = ev.target.closest('[data-qopt]'); if (o && !Q.done) { const v = o.dataset.qopt; Q.picked.has(v) ? Q.picked.delete(v) : (Q.picked.add(v), Q.crossed.delete(v)); return draw(); }
     if (ev.target.closest('[data-qcheck]')) { const q = Q.q, ok = q.correct.length === Q.picked.size && q.correct.every(x => Q.picked.has(x)); return answer(ok); }
+  });
+  // typed answers: anything that names nothing in the catalog (or only partly fits) isn't a miss
+  document.addEventListener('input', ev => { if (ev.target.id === 'qin') Q.draft = ev.target.value; });
+  document.addEventListener('submit', ev => {
+    if (!ev.target.closest('#quiz [data-qtype]')) return;
+    ev.preventDefault();
+    const q = Q.q; if (!q || Q.done) return;
+    const text = $('#qin').value.trim(); Q.draft = text; if (!text) return;
+    const kind = q.kind === 'cells' ? 'cell' : 'mark', key = resolve(kind, text);
+    const again = msg => { Q.msg = msg; draw(); const i = $('#qin'); if (i) { i.focus(); i.select(); } };
+    if (!key) { const near = nearest(kind, text); return again(`I don't know "${esc(text)}" as a ${kind === 'cell' ? 'cell type' : 'marker'}.${near ? ` Did you mean <b>${esc(near)}</b>?` : ' Try a full name or a common abbreviation.'} Not counted.`); }
+    const r = kind === 'cell' ? reading(key, q.mk) : reading(q.id, key);
+    if (r === null) return again(`<b>${esc(nameOf(kind, key))}</b> is only partly positive, or varies between cases: name one that's clearly positive. Not counted.`);
+    if (r && kind === 'mark' && COMMON.includes(key)) return again(`True, but nearly every cell has <b>${esc(nameOf(kind, key))}</b>: name one that says more. Not counted.`);
+    Q.typed = key; answer(r === true);
   });
   document.addEventListener('keydown', ev => {
     if ($('#quiz').hidden || !Q.q) return;
     if (Q.q.kind === 'match' && !Q.done && (ev.key === 'ArrowRight' || ev.key === 'ArrowLeft')) answer((ev.key === 'ArrowRight') === Q.q.answer);
-    else if (Q.done && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); next(); }
+    else if (Q.done && (ev.key === 'Enter' || ev.key === ' ') && !ev.target.closest('input, button')) { ev.preventDefault(); next(); }
   });
 
-  FC.markers = { open, close, modeHTML, kindsHTML, cellsHTML, makeQuestion: () => makeQuestion(), cfg: Q.cfg };
+  FC.markers = { open, close, modeHTML, kindsHTML, dirsHTML, cellsHTML, makeQuestion: () => makeQuestion(), cfg: Q.cfg };
 })();

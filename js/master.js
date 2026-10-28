@@ -6,6 +6,8 @@
                only markers that differ between the shown cells
      group     cells by lineage, by normal / abnormal, or not at all
      sort      catalog order, A to Z, or by one marker (carriers first, brightest first)
+     axes      cells down the side and markers across (default), or switched
+   Clear all filters puts search and filters back (grouping, sorting and axes stay).
    Tap a cell or a marker for everything about it. Readings are written as symbols with a legend, never
    as color alone. Choices are kept in localStorage (flowcyto.master). */
 (function () {
@@ -22,6 +24,7 @@
     filter: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3.5h12M4.5 8h7M7 12.5h2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
     search: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M10.2 10.2l3.3 3.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
     abn: '<svg class="ic abn" viewBox="0 0 16 16" aria-label="abnormal" role="img"><path d="M8 2.5l5.5 5.5L8 13.5 2.5 8z" fill="currentColor"/></svg>',
+    swap: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 5.5h9.5M10 3l2.5 2.5L10 8M13 10.5H3.5M6 8l-2.5 2.5L6 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     sort: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3v10M2.5 10.5L5 13l2.5-2.5M11 13V3M8.5 5.5L11 3l2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   };
 
@@ -55,7 +58,7 @@
   const fullOf = mk => MARKERS[mk].full || (/^CD\d/.test(mk) ? `cluster of differentiation ${mk.slice(2)}` : '');
 
   // ---------- state ----------
-  const M = load('flowcyto.master', { q: '', normal: true, abnormal: true, lins: [], mgroups: [], group: 'lineage', sort: 'catalog', by: null, hideEmpty: true, onlyDiff: false, open: false });
+  const M = load('flowcyto.master', { q: '', normal: true, abnormal: true, lins: [], mgroups: [], group: 'lineage', sort: 'catalog', by: null, hideEmpty: true, onlyDiff: false, open: false, flip: false });
   const keep = () => save('flowcyto.master', Object.assign({}, M, { q: '' })); // the search box starts empty each time
   let detail = null, gate = null;
 
@@ -97,12 +100,39 @@
       <div class="mf-row"><b>Show</b><div class="mchips">${chip('data-mflag="hideEmpty"', M.hideEmpty, 'Hide markers none of these carry')}${chip('data-mflag="onlyDiff"', M.onlyDiff, 'Only markers that differ')}</div></div>
       <div class="mf-row"><b>Group</b>${seg('group', [['lineage', 'Lineage'], ['kind', 'Normal / abnormal'], ['none', 'None']])}</div>
       <div class="mf-row"><b>Sort</b>${seg('sort', [['catalog', 'Catalog'], ['az', 'A to Z']])}</div>
-      <p class="mf-note">No lineage or marker group picked means all of them. Tap a marker's name to sort by it.</p>
+      <div class="mf-foot"><p class="mf-note">No lineage or marker group picked means all of them. Tap a marker's name to sort by it.</p><button class="btn" data-mreset ${nFilters() || M.q ? '' : 'disabled'}>${ICON.close}<span>Clear all filters</span></button></div>
     </div>`;
   }
   const nFilters = () => (!M.normal || !M.abnormal ? 1 : 0) + M.lins.length + M.mgroups.length + (M.onlyDiff ? 1 : 0) + (!M.hideEmpty ? 1 : 0);
+  const cellGroup = e => M.group === 'lineage' ? LINEAGES.find(l => l[0] === e.lineage)[1] : M.group === 'kind' ? (e.kind === 'normal' ? 'Normal' : 'Abnormal') : null;
+  const groupCells = rows => M.group === 'none' ? rows : rows.slice().sort((a, b) => {
+    const k = e => M.group === 'lineage' ? LINEAGES.findIndex(l => l[0] === e.lineage) : e.kind === 'normal' ? 0 : 1;
+    return k(a) - k(b);
+  });
+  const cellName = e => `${e.kind === 'normal' ? '' : ICON.abn}${esc(e.name)}`;
+  const cellTd = (e, mk) => { const [sym, cls, words] = reading(e, mk); return `<td class="${cls}${M.by === mk && !M.flip ? ' by' : ''}" title="${esc(e.name)} · ${esc(MARKERS[mk].name)}: ${words}">${sym}</td>`; };
+  const markHead = mk => `data-mmark="${esc(mk)}" title="${esc(MARKERS[mk].name)}${fullOf(mk) ? ': ' + esc(fullOf(mk)) : ''}"`;
+  /* Switched axes: markers down the side (under their family headings), cell types across the top
+     (under their lineage or normal / abnormal headings) */
+  function flippedHTML(rows, cols) {
+    const cells = groupCells(rows);
+    let gh = '<tr class="mgh"><th class="corner" rowspan="2"><span>Marker</span></th>', last, span = 0;
+    const flush = () => { if (span) gh += `<th colspan="${span}"><span>${last || ''}</span></th>`; };
+    last = undefined;
+    for (const e of cells) { const g = cellGroup(e); if (g !== last) { flush(); last = g; span = 0; } span++; }
+    flush(); gh += '</tr>';
+    const ch = `<tr class="mmh">${cells.map(e => `<th class="mk" data-mcell="${e.id}" title="${esc(e.long || e.name)}"><span>${cellName(e)}</span></th>`).join('')}</tr>`;
+    let body = '', grp = null;
+    for (const mk of cols) {
+      const g = GROUP_OF[mk];
+      if (g !== grp) { grp = g; body += `<tr class="mgrp"><th colspan="${cells.length + 1}"><span>${MGROUPS.find(x => x[0] === g)[1]}</span></th></tr>`; }
+      body += `<tr${M.by === mk ? ' class="byrow"' : ''}><th class="cell" ${markHead(mk)}><span>${esc(MARKERS[mk].name)}${M.by === mk ? ICON.sort : ''}</span></th>${cells.map(e => cellTd(e, mk)).join('')}</tr>`;
+    }
+    return `<div class="mscroll"><table class="mgrid flip"><thead>${gh}${ch}</thead><tbody>${body}</tbody></table></div>`;
+  }
   function tableHTML(rows, cols) {
     if (!rows.length || !cols.length) return `<p class="mempty">Nothing matches. ${M.q ? 'Try a shorter search, or ' : ''}<button class="linkbtn" data-mreset>clear the filters</button>.</p>`;
+    if (M.flip) return flippedHTML(rows, cols);
     // marker-group header across the top, then the marker names (sideways)
     let gh = '<tr class="mgh"><th class="corner" rowspan="2"><span>Cell type</span></th>', last = null, span = 0;
     const flush = () => { if (last) gh += `<th colspan="${span}" class="g-${last}"><span>${MGROUPS.find(g => g[0] === last)[1]}</span></th>`; };
@@ -124,7 +154,7 @@
   }
   const LEGEND = `<div class="mlegend"><span><b>++</b> bright</span><span><b>+</b> positive</span><span><b>dim</b></span><span class="part"><b>±</b> partly</span><span class="part"><b>var</b> varies</span><span><b>–</b> negative</span><span><b>κλ</b> both light chains · <b>κ|λ</b> one</span><span>${ICON.abn} abnormal</span></div>`;
 
-  const resultsHTML = (rows, cols) => `<div class="m-sum"><span>${rows.length} cell type${rows.length === 1 ? '' : 's'} · ${cols.length} marker${cols.length === 1 ? '' : 's'}</span>${M.by ? `<button class="mchip on" data-munsort aria-pressed="true">${ICON.sort}<span>Sorted by ${esc(MARKERS[M.by].name)}</span>${ICON.close}</button>` : ''}</div>${tableHTML(rows, cols)}${LEGEND}`;
+  const resultsHTML = (rows, cols) => `<div class="m-sum"><span>${rows.length} cell type${rows.length === 1 ? '' : 's'} · ${cols.length} marker${cols.length === 1 ? '' : 's'}</span>${nFilters() ? `<button class="mchip" data-mreset aria-label="Clear all filters">${ICON.close}<span>Clear ${nFilters()} filter${nFilters() === 1 ? '' : 's'}</span></button>` : ''}${M.by ? `<button class="mchip on" data-munsort aria-pressed="true">${ICON.sort}<span>Sorted by ${esc(MARKERS[M.by].name)}</span>${ICON.close}</button>` : ''}</div>${tableHTML(rows, cols)}${LEGEND}`;
   // typing redraws the results only, so the search box (and the phone keyboard) stays put
   function refresh() { const r = dlg().querySelector('.m-results'); if (!r) return draw(); const { rows, cols } = view(); r.innerHTML = resultsHTML(rows, cols); }
   function draw(focusSearch) {
@@ -135,6 +165,7 @@
       ${gate ? gateHTML() : `<div class="m-tools">
         <label class="msearch">${ICON.search}<input type="search" id="mq" placeholder="Search cells and markers" value="${esc(M.q)}" autocomplete="off" spellcheck="false"></label>
         <button class="btn mfbtn" data-mfilters aria-expanded="${M.open}">${ICON.filter}<span>Filters${n ? ` (${n})` : ''}</span></button>
+        <button class="btn mfbtn mswap" data-mflip aria-pressed="${M.flip}" aria-label="Switch axes: ${M.flip ? 'cell types down the side' : 'markers down the side'}" title="Switch axes">${ICON.swap}<span>Switch axes</span></button>
       </div>
       ${M.open ? filtersHTML() : ''}
       <div class="m-results">${resultsHTML(rows, cols)}</div>`}
@@ -192,6 +223,7 @@
       if (c('[data-mclose]')) return close();
       if (c('[data-mgo]')) { const g = gate; gate = null; if (g.onOpen) g.onOpen(); return draw(); }
       if (c('[data-mdclose]') || (detail && t.classList.contains('mdetail'))) { detail = null; return draw(); }
+      if (c('[data-mflip]')) { M.flip = !M.flip; keep(); return draw(); }
       if (c('[data-mfilters]')) { M.open = !M.open; keep(); return draw(); }
       if (c('[data-mreset]')) { Object.assign(M, { q: '', normal: true, abnormal: true, lins: [], mgroups: [], onlyDiff: false, hideEmpty: true }); keep(); return draw(); }
       const tog = (arr, v) => arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v];
