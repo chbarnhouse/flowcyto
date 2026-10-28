@@ -20,6 +20,7 @@
     back: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3L5 8l5 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     close: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
     list: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5l1.2 1.2 2-2.4M2.5 10.5l1.2 1.2 2-2.4M8 5h5.5M8 11h5.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    pause: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 3.5v9M10.5 3.5v9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>',
     gear: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h6M12 4.5h1.5M2.5 11.5h1.5M7.5 11.5h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="10.2" cy="4.5" r="1.7" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="5.8" cy="11.5" r="1.7" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>',
   };
   const KINDS = { match: 'Does it carry it? (swipe)', cells: 'Marker → which cells', markers: 'Cell → which markers' };
@@ -91,16 +92,17 @@
 
   /* The answer lists: every marker a cell carries, every cell (in the quiz's cell types) carrying a
      marker. Dim, bright, partly (split) and varies are said in words. */
-  const TAG = { dim: 'dim', bright: 'bright', split: 'partly', var: 'varies', poly: 'κ and λ', clonal: 'one only' };
+  const TAG = { dim: 'dim', bright: 'bright', split: 'partly', var: 'varies', poly: 'both', clonal: 'one only' };
   const carries = lv => lv && lv !== '-';
   const cellMarkers = id => Object.keys(MARKERS).filter(mk => !MARKERS[mk].scatter && carries(BY[id].m[mk])).map(mk => ({ kind: 'mark', key: mk, lv: BY[id].m[mk] }));
   const markerCells = mk => cellPool().filter(id => carries(BY[id].m[mk])).map(id => ({ kind: 'cell', key: id, lv: BY[id].m[mk] }));
-  function listHTML(title, items, hit) {
-    if (!items.length) return `<h4 class="qlist-h">${title}</h4><p class="help">None of these cell types.</p>`;
-    return `<h4 class="qlist-h">${title}</h4><ul class="qlist">${items.map(it => {
-      const f = spelled(it.kind, it.key), tag = TAG[it.lv];
-      return `<li${it.key === hit ? ' class="hit"' : ''}><b>${esc(nameOf(it.kind, it.key))}${tag ? ` <i>${tag}</i>` : ''}</b>${f ? `<span>${esc(f)}</span>` : ''}</li>`;
-    }).join('')}</ul>`;
+  // one answer list as a small table: name · full name · how it reads (in words), the asked one shaded and tagged
+  function sectionHTML(title, items, hit, foot) {
+    const rows = items.map(it => {
+      const f = spelled(it.kind, it.key), tag = TAG[it.lv], asked = it.key === hit;
+      return `<tr${asked ? ' class="hit"' : ''}><th>${esc(nameOf(it.kind, it.key))}</th><td>${esc(f)}</td><td class="lv">${tag ? `<span class="pill">${tag}</span>` : ''}${asked ? '<span class="pill asked">asked</span>' : ''}</td></tr>`;
+    }).join('');
+    return `<section class="qsec"><h4>${title}</h4>${items.length ? `<table class="qtab ${items[0].kind}">${rows}</table>` : '<p class="help">None of these cell types.</p>'}${foot ? `<p class="qfoot">${foot}</p>` : ''}</section>`;
   }
   // "CLL / SLL (chronic lymphocytic leukemia / …)"; a full name with its own parentheses goes between commas
   const withFull = (kind, key) => {
@@ -137,6 +139,7 @@
       ${modeHTML()}<button class="btn primary big" data-qstart>Start</button></section></main>`;
   }
   function next() {
+    if (Q.auto) { clearTimeout(Q.auto.timer); clearInterval(Q.auto.tick); } Q.auto = null;
     Q.q = makeQuestion(); Q.picked = new Set(); Q.crossed = new Set(); Q.done = false; Q.right = null;
     if (!Q.q) { $('#quiz').innerHTML = bar() + '<main class="qmain"><section class="qcard card"><p>No questions fit these settings. Try more cell types.</p></section></main>'; return; }
     draw();
@@ -168,15 +171,18 @@
   // the verdict pops up over the bottom of the screen; the question stays visible above it
   function popupHTML() {
     const q = Q.q, mk = q.mk && MARKERS[q.mk];
-    const note = mk && mk.note ? `<p class="help">${withFull('mark', q.mk).replace(/,$/, '')}: ${esc(mk.note)}</p>` : '';
-    const teach = q.id && BY[q.id].teach ? `<p class="help">${esc(BY[q.id].teach)}</p>` : '';
-    const onCell = id => listHTML(`Every marker on ${esc(BY[id].name)}`, cellMarkers(id), q.mk);
-    const withMark = m => listHTML(`Every ${{ normal: 'normal cell', neoplasm: 'abnormal cell', both: 'cell' }[Q.cfg.cells]} with ${esc(MARKERS[m].name)}`, markerCells(m), q.id);
+    const note = mk && mk.note ? `<b>${esc(mk.name)}</b>: ${esc(mk.note)}` : '';
+    const teach = q.id && BY[q.id].teach ? esc(BY[q.id].teach) : '';
+    const set = { normal: 'Normal cells', neoplasm: 'Abnormal cells', both: 'Cells' }[Q.cfg.cells];
+    const onCell = (id, foot) => sectionHTML(`${esc(BY[id].name)} carries`, cellMarkers(id), q.mk, foot);
+    const withMark = (m, foot) => sectionHTML(`${set} with ${esc(MARKERS[m].name)}`, markerCells(m), q.id, foot);
     let line, body;
-    if (q.kind === 'match') { line = `${withFull('cell', q.id)} is <b>${esc(mk.name)}${q.answer ? '+' : '−'}</b>`; body = onCell(q.id) + note + withMark(q.mk) + teach; }
-    else if (q.kind === 'cells') { line = `Carry ${withFull('mark', q.mk)}: <b>${q.correct.map(o => esc(BY[o].name)).join(', ')}</b>`; body = note + withMark(q.mk); }
-    else { line = `${withFull('cell', q.id)} carries <b>${q.correct.map(o => esc(MARKERS[o].name)).join(', ')}</b>`; body = teach + onCell(q.id); }
-    return `<div class="qpop ${Q.right ? 'right' : 'wrong'}" role="status"><div class="qpop-in card"><div class="qpop-head">${Q.right ? ICON.yes : ICON.no}<b>${Q.right ? 'Right' : 'Not quite'}</b></div><div class="qpop-body"><p class="qpop-line">${line}</p>${body}</div><button class="btn big qpop-next" data-qnext>Next</button></div></div>`;
+    if (q.kind === 'match') { line = `${withFull('cell', q.id)} is <b>${esc(mk.name)}${q.answer ? '+' : '−'}</b>`; body = onCell(q.id, teach) + withMark(q.mk, note); }
+    else if (q.kind === 'cells') { line = `Carry ${withFull('mark', q.mk).replace(/,$/, '')}: <b>${q.correct.map(o => esc(BY[o].name)).join(', ')}</b>`; body = withMark(q.mk, note); }
+    else { line = `${withFull('cell', q.id).replace(/,$/, '')} carries <b>${q.correct.map(o => esc(MARKERS[o].name)).join(', ')}</b>`; body = onCell(q.id, teach); }
+    // auto-continue: a bar that runs down to the next question; press and hold (or scroll the answer) stops it
+    const a = Q.auto, timer = a ? `<div class="qtimer${a.paused ? ' paused' : ''}" style="--secs:${a.secs}s"><div class="qtimer-track"><i></i></div><span>${a.paused ? `${ICON.pause}<b>Paused</b> · Next when you're ready` : `Next question in <span class="qsecs">${a.secs}</span> s · <b>hold to pause</b>`}</span></div>` : '';
+    return `<div class="qpop ${Q.right ? 'right' : 'wrong'}" role="status"><div class="qpop-in card"><div class="qpop-head">${Q.right ? ICON.yes : ICON.no}<b>${Q.right ? 'Right' : 'Not quite'}</b></div><div class="qpop-body"><p class="qpop-line">${line}</p>${body}</div>${timer}<button class="btn big qpop-next" data-qnext>Next</button></div></div>`;
   }
   function draw() {
     hideFull();
@@ -186,10 +192,26 @@
   function answer(right) {
     Q.done = true; Q.right = right; Q.answered++;
     if (right) { Q.score++; Q.streak++; if (Q.streak > best()) save('flowcyto.markersBest', Q.streak); } else Q.streak = 0;
-    draw();
     // Settings: seconds until the next question after a right / wrong answer (0 = wait for Next)
     const q = Q.q, secs = +(right ? FC.prefs.quizRight : FC.prefs.quizWrong) || 0;
-    if (secs > 0) setTimeout(() => { if (Q.q === q && Q.done && !$('#quiz').hidden) next(); }, secs * 1000);
+    Q.auto = secs > 0 ? { secs, paused: false, end: performance.now() + secs * 1000, timer: setTimeout(() => { if (Q.q === q && Q.done && !$('#quiz').hidden) next(); }, secs * 1000) } : null;
+    draw();
+    // the seconds count down with the bar
+    const a = Q.auto;
+    if (a) a.tick = setInterval(() => {
+      const el = $('#quiz .qsecs');
+      if (Q.auto !== a || a.paused || !el) return clearInterval(a.tick);
+      el.textContent = Math.max(1, Math.ceil((a.end - performance.now()) / 1000));
+    }, 200);
+  }
+  // stops the countdown for good: the bar freezes and says Paused; Next is up to you
+  function pauseAuto() {
+    const a = Q.auto; if (!a || a.paused || !Q.done) return;
+    a.paused = true; clearTimeout(a.timer);
+    const t = $('#quiz .qtimer'); if (!t) return;
+    t.classList.add('paused');
+    t.querySelector('span').innerHTML = `${ICON.pause}<b>Paused</b> · Next when you're ready`;
+    if (navigator.vibrate) navigator.vibrate(10);
   }
 
   // ---------- swipe ----------
@@ -284,6 +306,19 @@
     if (el && FC.prefs.abbrOpen === 'tap') { showFull(el, true); ev.stopPropagation(); }
   }, true);
   document.querySelector('#quiz').addEventListener('contextmenu', ev => ev.preventDefault());
+
+  // a press and hold anywhere on the answer popup pauses auto-continue; so does scrolling the answer
+  let popHold = null, popHeld = false;
+  document.addEventListener('pointerdown', ev => {
+    popHeld = false; // a new touch: its click is a real one
+    if (!ev.target.closest('#quiz .qpop') || !Q.auto || Q.auto.paused) return;
+    popHold = { x: ev.clientX, y: ev.clientY, t: setTimeout(() => { popHold = null; popHeld = true; pauseAuto(); }, 350) };
+  });
+  addEventListener('pointermove', ev => { if (popHold && Math.hypot(ev.clientX - popHold.x, ev.clientY - popHold.y) > 10) { clearTimeout(popHold.t); popHold = null; } });
+  for (const t of ['pointerup', 'pointercancel', 'touchend', 'touchcancel']) addEventListener(t, () => { if (popHold) { clearTimeout(popHold.t); popHold = null; } }, true);
+  document.addEventListener('scroll', ev => { if (ev.target.closest && ev.target.closest('#quiz .qpop')) pauseAuto(); }, true);
+  // the hold's own click (on Next, say) does nothing
+  document.addEventListener('click', ev => { if (popHeld) { popHeld = false; if (ev.target.closest('#quiz .qpop')) { ev.stopPropagation(); ev.preventDefault(); } } }, true);
 
   // ---------- input ----------
   document.addEventListener('click', ev => {

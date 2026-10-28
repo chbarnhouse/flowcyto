@@ -517,11 +517,28 @@ html, body { touch-action: manipulation; }
 .qpop-in { max-height: calc(100dvh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
 .qpop-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; -webkit-user-select: text; user-select: text; }
 .qpop-line .full, .qpop .help .full { font-weight: 500; color: var(--ink-2); }
-.qlist-h { margin: 6px 0 0; font-size: 15px; color: var(--ink); }
-.qlist { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px 12px; }
-.qlist li { display: flex; flex-direction: column; padding: 4px 0 4px 8px; border-left: 3px solid var(--line); min-width: 0; }
-.qlist li.hit { border-left: 3px solid var(--ink); }
-.qlist li.hit b::after { content: ' · asked'; font-weight: 600; font-size: 13px; color: var(--ink-2); }
-.qlist b { font-size: 16px; color: var(--ink); }
-.qlist b i { font-style: normal; font-weight: 600; font-size: 13px; color: var(--ink-2); }
-.qlist span { font-size: 13px; color: var(--ink-2); line-height: 1.25; }
+.qpop-line { font-size: 19px; line-height: 1.35; }
+.qsec { background: var(--card); border-radius: 12px; padding: 10px 12px 8px; }
+.qsec h4 { margin: 0 0 4px; font-size: 13px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.qtab { width: 100%; border-collapse: collapse; }
+.qtab tr + tr > * { border-top: 1px solid var(--line-soft); }
+.qtab th { text-align: left; vertical-align: baseline; padding: 6px 12px 6px 0; font-size: 16px; font-weight: 800; color: var(--ink); width: 1%; min-width: 4.2em; }
+.qtab.mark th { white-space: nowrap; }
+.qtab.cell th { width: 42%; }
+.qtab td { vertical-align: baseline; padding: 6px 0; font-size: 14px; line-height: 1.3; color: var(--ink-2); }
+.qtab td.lv { text-align: right; white-space: nowrap; padding-left: 8px; width: 1%; }
+.qtab tr.hit > * { background: var(--sunk); }
+.qtab tr.hit th { padding-left: 6px; border-radius: 6px 0 0 6px; }
+.qtab tr.hit td.lv { padding-right: 6px; border-radius: 0 6px 6px 0; }
+.pill { display: inline-block; margin-left: 4px; padding: 1px 8px; border: 1.5px solid var(--line); border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--ink-2); }
+.pill.asked { border-color: var(--ink); color: var(--ink); }
+.qfoot { margin: 6px 0 2px; padding-top: 8px; border-top: 1px dashed var(--line); font-size: 14px; line-height: 1.35; color: var(--ink-2); }
+/* auto-continue: the bar runs down; paused, it freezes and says so */
+.qtimer { display: flex; flex-direction: column; gap: 5px; }
+.qtimer-track { height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--ink) 14%, transparent); overflow: hidden; }
+.qtimer-track i { display: block; height: 100%; background: var(--ink-2); transform-origin: left; animation: qtimer var(--secs) linear forwards; }
+.qtimer.paused .qtimer-track i { animation-play-state: paused; opacity: .45; }
+.qtimer > span { display: block; font-size: 14px; color: var(--ink-2); }
+.qtimer .ic { width: 14px; height: 14px; vertical-align: -2px; margin-right: 4px; }
+@keyframes qtimer { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+@media (prefers-reduced-motion: reduce) { .qtimer-track i { animation-duration: var(--secs); } }
