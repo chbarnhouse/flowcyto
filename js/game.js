@@ -124,7 +124,7 @@
     document.documentElement.classList.remove('in-game');
     document.title = 'FlowCyto';
     const stats = load('flowcyto.stats', {}), cur = load('flowcyto.current', null);
-    let h = `<main class="menu-in"><div class="menu-top"><div class="logo on-page"><svg width="52" height="52" viewBox="0 0 22 22" aria-hidden="true"><rect x="1" y="1" width="20" height="20" rx="5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M11 3v16M3 11h16" stroke="currentColor" stroke-width="1" stroke-dasharray="2 2"/><circle cx="7" cy="15" r="2.2" fill="currentColor"/><path d="M15 4.6l2.2 3.6h-4.4z" fill="currentColor"/></svg><div><h1>FlowCyto</h1><p>Flow cytometry logic puzzles for STEP 1</p></div></div><div class="menu-btns">${PUBLIC_HOST.test(location.hostname) ? '' : `<button class="gearbtn" data-share aria-label="Copy the shareable link" title="Copy the shareable link">${ICON.share}</button>`}<button class="gearbtn" data-settings aria-label="Settings" title="Settings">${ICON.gear}</button></div></div>`;
+    let h = `<main class="menu-in"><div class="menu-top"><div class="logo on-page"><svg width="52" height="52" viewBox="0 0 22 22" aria-hidden="true"><rect x="1" y="1" width="20" height="20" rx="5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M11 3v16M3 11h16" stroke="currentColor" stroke-width="1" stroke-dasharray="2 2"/><circle cx="7" cy="15" r="2.2" fill="currentColor"/><path d="M15 4.6l2.2 3.6h-4.4z" fill="currentColor"/></svg><div><h1>FlowCyto</h1><p>Flow cytometry logic puzzles for STEP 1</p></div></div><div class="menu-btns"><button class="gearbtn" data-master aria-label="Master reference" title="Master reference">${FC.master.ICON}</button>${PUBLIC_HOST.test(location.hostname) ? '' : `<button class="gearbtn" data-share aria-label="Copy the shareable link" title="Copy the shareable link">${ICON.share}</button>`}<button class="gearbtn" data-settings aria-label="Settings" title="Settings">${ICON.gear}</button></div></div>`;
     // (the share button is on Charlie's own copy only: it copies the public link to pass on)
     if (cur && cur.phase !== 'done' && LEVEL_KEYS.includes(cur.level)) {
       h += `<button class="card cont" data-continue><span class="cont-k">Continue</span><b>${levelLabel(cur.level)}</b><span>${cur.phase === 'dx' ? 'Diagnosis' : 'Scratchpad'} · ${plural(cur.wrongChecks || 0, 'mistake')}</span>${ICON.next}</button>`;
@@ -148,6 +148,7 @@
     if (ev.target.closest('[data-custom]')) return openCustom();
     if (ev.target.closest('[data-markers]')) { location.hash = 'markers'; return; }
     if (ev.target.closest('[data-settings]')) openSettings();
+    if (ev.target.closest('[data-master]')) FC.master.open();
     const sh = ev.target.closest('[data-share]'); if (sh) copyShareLink(sh);
   });
   const PUBLIC_URL = 'https://chbarnhouse.github.io/flowcyto/', PUBLIC_HOST = /\.github\.io$/;
@@ -193,7 +194,7 @@
     S = { level, seed, P, cfg: P.cfg, custom, marks: {}, checked: {}, wrongChecks: 0, hints: 0, peeks: new Set(), pad: {}, refRow: null,
       cols: P.choose ? [] : P.pool.slice(), refs: [...new Set(refs0)], typed: [], dxHint: 0,
       focus: null, crossed: [], phase: P.cfg.scratch ? 'play' : 'dx', pctPick: null, msg: null, flash: null, elapsed: 0, t0: null, undo: [], why: null };
-    if (saved) Object.assign(S, { marks: saved.marks || {}, checked: saved.checked || {}, wrongChecks: saved.wrongChecks || 0, hints: saved.hints || 0, peeks: new Set(saved.peeks || []), pad: saved.pad || {}, phase: saved.phase || S.phase, pctPick: saved.pctPick || null, msg: saved.msg || null, stats: saved.stats, elapsed: saved.elapsed || 0, cols: saved.cols || S.cols, refs: saved.refs || S.refs, typed: saved.typed || [], dxHint: saved.dxHint || 0, crossed: saved.crossed || [] });
+    if (saved) Object.assign(S, { marks: saved.marks || {}, checked: saved.checked || {}, wrongChecks: saved.wrongChecks || 0, hints: saved.hints || 0, peeks: new Set(saved.peeks || []), master: !!saved.master, pad: saved.pad || {}, phase: saved.phase || S.phase, pctPick: saved.pctPick || null, msg: saved.msg || null, stats: saved.stats, elapsed: saved.elapsed || 0, cols: saved.cols || S.cols, refs: saved.refs || S.refs, typed: saved.typed || [], dxHint: saved.dxHint || 0, crossed: saved.crossed || [] });
     if (gating()) {
       S.gates = (saved && saved.gates) || P.plots.map(() => null); // nothing placed: the player sets every gate
       S.sigSlot = (saved && saved.sigSlot) || {}; S.slotSig = {};
@@ -240,7 +241,7 @@
   }
   function persist() {
     if (!S) return;
-    save('flowcyto.current', { level: S.level, seed: S.seed, custom: S.custom, marks: S.marks, checked: S.checked, wrongChecks: S.wrongChecks, hints: S.hints, peeks: [...S.peeks], pad: S.pad, cols: S.cols, refs: S.refs, typed: S.typed, dxHint: S.dxHint, phase: S.phase, pctPick: S.pctPick, msg: S.msg, stats: S.stats, gates: S.gates, sigSlot: S.sigSlot, cloneRow: S.cloneRow, crossed: S.crossed, elapsed: elapsedNow() });
+    save('flowcyto.current', { level: S.level, seed: S.seed, custom: S.custom, marks: S.marks, checked: S.checked, wrongChecks: S.wrongChecks, hints: S.hints, peeks: [...S.peeks], master: !!S.master, pad: S.pad, cols: S.cols, refs: S.refs, typed: S.typed, dxHint: S.dxHint, phase: S.phase, pctPick: S.pctPick, msg: S.msg, stats: S.stats, gates: S.gates, sigSlot: S.sigSlot, cloneRow: S.cloneRow, crossed: S.crossed, elapsed: elapsedNow() });
   }
 
   const shownPlots = () => S.P.plots.map(p => [p.x, p.y]);
@@ -654,7 +655,7 @@
 
   // ---------- answer panel: scratchpad, then diagnosis ----------
   function tallyText() {
-    return `${plural(S.wrongChecks, 'mistake')} · ${plural(S.hints, 'hint')}${refFilled() ? '' : ' · ' + plural(S.peeks.size, 'peek')}`;
+    return `${plural(S.wrongChecks, 'mistake')} · ${plural(S.hints, 'hint')}${refFilled() ? '' : ' · ' + plural(S.peeks.size, 'peek')}${S.master ? ' · master reference' : ''}`;
   }
   const refButton = () => `<button class="refbtn" id="refBtn">${ICON.book}<span>Reference</span></button>`;
   function scratchHTML(play) {
@@ -820,7 +821,7 @@
   }
   function record() {
     const st = load('flowcyto.stats', {}), k = S.level, v = st[k] || { solved: 0, clean: 0 };
-    v.solved++; if (!S.wrongChecks && !S.peeks.size && !S.hints) v.clean++;
+    v.solved++; if (!S.wrongChecks && !S.peeks.size && !S.hints && !S.master) v.clean++;
     const ms = elapsedNow(); S.time = ms; S.newBest = !v.best || ms < v.best; if (S.newBest) v.best = ms;
     st[k] = v; save('flowcyto.stats', st); S.stats = v;
   }
@@ -1005,7 +1006,7 @@
   // ---------- recap ----------
   function recap() {
     const P = S.P, plots = P.plots, t = target();
-    let h = `<div class="recap"><p class="tally">${tallyText()}${prefs.timer && S.time ? ` · ${fmtTime(S.time)}${S.newBest ? ' (personal best)' : ''}` : ''}. ${S.stats ? `${S.stats.solved} solved at this level, ${S.stats.clean} clean (no mistakes, hints or peeks).` : ''}</p>`;
+    let h = `<div class="recap"><p class="tally">${tallyText()}${prefs.timer && S.time ? ` · ${fmtTime(S.time)}${S.newBest ? ' (personal best)' : ''}` : ''}. ${S.stats ? `${S.stats.solved} solved at this level, ${S.stats.clean} clean (no mistakes, hints, peeks or master reference).` : ''}</p>`;
     if (S.why) h += whyHTML();
     if (S.cfg.dx) h += `<h3>Diagnosis</h3><div class="item">${esc(BY[t.id].long)}${t.lc === 'kappa' || t.lc === 'lambda' ? ` (${t.lc} restricted)` : ''} · ${Math.round(t.frac * 100)}% of events <button class="btn mini" data-whydx>Why?</button><div class="why">${esc(BY[t.id].teach)}</div></div>`;
     if (S.cfg.scratch) {
@@ -1353,6 +1354,12 @@
   $('#hintBtn').addEventListener('click', hint);
   $('#undoBtn').addEventListener('click', undo);
   $('#setBtn').addEventListener('click', openSettings);
+  /* The master reference from a board: where you fill in the reference yourself, it would hand you
+     every row, so it asks first and counts against a clean solve. */
+  $('#masterBtn').addEventListener('click', () => {
+    if (!S || S.phase === 'done' || refFilled() || S.master) return FC.master.open();
+    FC.master.open({ warn: true, onOpen: () => { S.master = true; persist(); drawPanel(); } });
+  });
   addEventListener('resize', () => { if (!S) return; fitPlots(); fitHeight($('#panel'), $('#panel .lgrid'), $('#panel .gridwrap')); if (refIsOpen()) { placeRef(); drawRef(); } });
   addEventListener('hashchange', () => { const t = $('#holdtip'); if (t) t.hidden = true; route(); });
 

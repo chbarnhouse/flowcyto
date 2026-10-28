@@ -127,7 +127,7 @@
     setup();
   }
   function close() { $('#quiz').hidden = true; hideFull(); }
-  const bar = () => `<header class="bar"><div class="bar-in"><button class="iconbtn" data-qmenu aria-label="Main menu">${ICON.back}<span>Menu</span></button><div class="gtitle"><b>Markers</b><span>${Q.answered ? `${Q.score} of ${Q.answered} · streak ${Q.streak} · best ${best()}` : `best streak ${best()}`}</span></div><button class="iconbtn" data-qsettings aria-label="Settings">${ICON.gear}<span>Settings</span></button></div></header>`;
+  const bar = () => `<header class="bar"><div class="bar-in"><button class="iconbtn" data-qmenu aria-label="Main menu">${ICON.back}<span>Menu</span></button><div class="gtitle"><b>Markers</b><span>${Q.answered ? `${Q.score} of ${Q.answered} · streak ${Q.streak} · best ${best()}` : `best streak ${best()}`}</span></div><span class="bar-btns"><button class="iconbtn" data-qmaster aria-label="Master reference">${FC.master.ICON}<span>Reference</span></button><button class="iconbtn" data-qsettings aria-label="Settings">${ICON.gear}<span>Settings</span></button></span></div></header>`;
   // the quiz's own settings: shown on the start screen and at the top of Settings
   function kindsHTML() {
     const c = Q.cfg, chip = (k, label) => `<button class="qchip" data-qkind="${k}" aria-pressed="${!!c.kinds[k]}">${c.kinds[k] ? ICON.yes : '<span class="ic"></span>'}<span>${label}</span></button>`;
@@ -337,6 +337,7 @@
     if (!ev.target.closest('#quiz')) return;
     if (ev.target.closest('[data-qmenu]')) { location.hash = '/'; return; }
     if (ev.target.closest('[data-qsettings]')) return FC.openSettings();
+    if (ev.target.closest('[data-qmaster]')) return FC.master.open();
     if (ev.target.closest('[data-qstart]')) return next();
     if (ev.target.closest('[data-qnext]')) return next();
     const yn = ev.target.closest('[data-yn]'); if (yn && !Q.done) return answer((yn.dataset.yn === 'yes') === Q.q.answer);
