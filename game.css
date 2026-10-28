@@ -77,6 +77,7 @@ html.in-game, html.in-game body { background: var(--card); }
 .lgrid td button { width: 100%; height: 100%; border: 0; background: none; cursor: pointer; display: grid; place-items: center; }
 .lgrid td.no { background: var(--sunk); }
 .lgrid td.yes { background: var(--blue-bg); }
+.lgrid td.maybe { background: var(--gold-bg); }
 .lgrid tr.focus th { color: var(--blue); text-decoration: underline; text-underline-offset: 3px; }
 .rowmark { display: inline-flex; gap: 3px; align-items: center; font-size: var(--fs-xs); font-weight: 700; margin-left: 4px; }
 .rowmark.right { color: var(--teal); }

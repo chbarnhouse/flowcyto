@@ -17,6 +17,7 @@
     hold: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.6" fill="currentColor"/><circle cx="8" cy="8" r="5.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2.2 2"/></svg>',
     no: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="var(--ink-2)" stroke-width="2.2" stroke-linecap="round"/></svg>',
     yes: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5" fill="var(--blue)" stroke="var(--ink)" stroke-width="1"/></svg>',
+    maybe: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.6 5.8a2.4 2.4 0 1 1 3.3 2.2c-.6.3-.9.8-.9 1.4v.6" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round"/><circle cx="8" cy="12.9" r="1.2" fill="var(--gold)"/></svg>',
     right: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 5" fill="none" stroke="var(--teal)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     wrong: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="var(--pink)" stroke-width="2.4" stroke-linecap="round"/></svg>',
     share: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 10V2.5M5.2 5L8 2.2 10.8 5M5 7.2H4a1 1 0 0 0-1 1V13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V8.2a1 1 0 0 0-1-1h-1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
@@ -32,7 +33,7 @@
     plus: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
     next: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   };
-  const MARK_WORD = { no: 'ruled out', yes: 'chosen' };
+  const MARK_WORD = { no: 'ruled out', yes: 'chosen', maybe: 'maybe' };
   const LEVEL_NOTES = {
     easy: 'Just the plots and cell types you need. Diagnosis from 4.',
     medium: 'Extra plots and absent cell types. Diagnosis from 4.',
@@ -662,7 +663,7 @@
     const P = S.P;
     let h = `<div class="ans-head"><h2>Scratchpad</h2>${refButton()}</div>`;
     if (gating()) h += `<p class="gstat">${S.gates.some(Boolean) ? `${plural(S.groups.length, 'group')}${S.extraGroups ? ` (+${S.extraGroups} too many to letter)` : ''}` : 'No gates yet: drag on a plot to place one'} · this tube has ${P.pops.length} populations</p>`;
-    else h += `<p class="sub">Give every population an identity; none is used twice${S.cfg.dx ? ', and exactly one is the abnormal clone' : ''}. Tap a cell: ruled out, then chosen, then blank. Tap a letter to highlight it in every plot.</p>`;
+    else h += `<p class="sub">Give every population an identity; none is used twice${S.cfg.dx ? ', and exactly one is the abnormal clone' : ''}. Tap a cell: chosen, then ruled out, then maybe, then blank. Tap a letter to highlight it in every plot.</p>`;
     if (!S.cols.length) h += `<p class="empty">Choose which cell types to consider${S.cfg.dx ? ', including Abnormal (clone)' : ''}.</p>`;
     const cell = (p, id) => { const m = S.marks[p.label + '|' + id]; return `<td class="${m || ''}"><button data-cell="${p.label}|${id}" ${play ? '' : 'disabled'} aria-label="${p.label}, ${esc(nameOf(id))}: ${m ? MARK_WORD[m] : 'blank'}">${m ? ICON[m] : ''}</button></td>`; };
     const colName = id => `<button class="colh${id === 'abn' ? ' abn' : ''}" data-colh="${id}" title="${esc(BY[id].long)}">${esc(nameOf(id))}</button>`;
@@ -937,7 +938,7 @@
     for (const { p, r, key, sol } of list) {
       if (S.marks[key(sol)] === 'yes') continue;
       for (const id of S.cols) {
-        if (S.marks[key(id)] || fits(id, p, mks)) continue;
+        if (S.marks[key(id)] === 'no' || S.marks[key(id)] === 'yes' || fits(id, p, mks)) continue;
         const c = firstContradiction(id, p);
         S.marks[key(id)] = 'no';
         return say(`${rowTag(r)} is not ${esc(nameOf(id))}: ${esc(c.text)}. Crossed it out.`, r, c.plot);
@@ -986,7 +987,7 @@
     const bad = pool.find(id => S.marks[key(id)] === 'yes' && id !== t.id);
     if (bad) { delete S.marks[key(bad)]; const c = firstContradiction(bad, t); return say(`Not ${esc(BY[bad].name)}: ${esc(c ? c.text : 'it doesn\'t fit')}. Cleared it.`, null, c && c.plot); }
     for (const id of pool) {
-      if (id === t.id || S.marks[key(id)]) continue;
+      if (id === t.id || S.marks[key(id)] === 'no' || S.marks[key(id)] === 'yes') continue;
       const c = firstContradiction(id, t);
       if (c) { S.marks[key(id)] = 'no'; return say(`Not ${esc(BY[id].name)}: ${esc(c.text)}. Crossed it out.`, null, c.plot); }
     }
@@ -1082,7 +1083,7 @@
   });
 
   // ---------- panel input ----------
-  const cycle = m => m === undefined ? 'no' : m === 'no' ? 'yes' : undefined;
+  const cycle = m => m === undefined ? 'yes' : m === 'yes' ? 'no' : m === 'no' ? 'maybe' : undefined; // blank → yes → no → maybe → blank
   $('#panel').addEventListener('change', ev => {
     const ad = ev.target.closest('[data-addcol]');
     if (ad && ad.value) { pushUndo(); addCol(ad.value); afterEdit(); }
@@ -1375,7 +1376,7 @@
   const TOURS = {
     labeled: [
       ['#plots', 'Every population in this tube has its own shape and letter, the same in every plot. The dashed lines split negative from positive: read which side each letter sits on.'],
-      ['.lgrid', 'The scratchpad: rows are the populations, columns are identities, and none is used twice. One population is the abnormal clone. Tap a cell once to rule it out, twice to choose it.'],
+      ['.lgrid', 'The scratchpad: rows are the populations, columns are identities, and none is used twice. One population is the abnormal clone. Tap a cell once to choose it, twice to rule it out, three times to mark it maybe.'],
       REF_STEP,
       ['#hintBtn', 'Stuck? Hint makes one logical step and says why. Undo takes back your last move.'],
       ['.actions', 'Check when every row has a choice. Then you name the clone. After solving, Why? replays the plots that decided it.'],
