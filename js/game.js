@@ -1314,7 +1314,7 @@
     } else {
       h += sec('Markers quiz');
       h += `<div class="set-row qset"><div><b>Questions</b><span>At least one kind stays on.</span></div>${FC.markers.kindsHTML()}</div>`;
-      h += `<div class="set-row"><div><b>Cell types</b><span>Normal cells, abnormal ones (neoplasms and clones), or both. The answers list the same ones.</span></div>${FC.markers.cellsHTML()}</div>`;
+      h += `<div class="set-row"><div><b>Cell types</b><span>Which cells the questions ask about: normal, abnormal (neoplasms and clones), or both. The answers always list every cell, normal and abnormal under their own headings.</span></div>${FC.markers.cellsHTML()}</div>`;
       h += `<div class="set-row"><div><b>Full names</b><span>Abbreviations have a dotted underline. Press and hold one (slide to Keep it open to leave it up), or tap it. Holding a choice always shows its full name without picking it.</span></div>${seg('abbrOpen', [['hold', 'Press and hold'], ['tap', 'Tap']])}</div>`;
       const secs = [[0, 'Off'], [1, '1 s'], [2, '2 s'], [3, '3 s'], [5, '5 s']];
       h += `<div class="set-row"><div><b>Next question after a right answer</b><span>Off: wait for Next. A bar counts down; press and hold the answer (or scroll it) to pause.</span></div>${seg('quizRight', secs)}</div>`;

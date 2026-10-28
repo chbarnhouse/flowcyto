@@ -276,7 +276,7 @@
           let level = e.m[mk] || '-';
           if (level === 'var') level = pop.res[mk] === 'pos' ? '+' : '-';
           if (level === 'split') {
-            const on = e.cont ? (e.cont.late.includes(mk) ? u > 0.5 : u < 0.45) : r() < 0.5;
+            const on = e.cont ? (e.cont.late.includes(mk) ? u > 0.5 : u < 0.45) : r() < ((e.frac && e.frac[mk]) || 0.5);
             level = on ? '+' : '-';
           }
           o[mk] = lv(level === '-' ? 'neg' : level === '+' ? 'pos' : level, r);

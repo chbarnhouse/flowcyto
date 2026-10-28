@@ -95,12 +95,15 @@
   const TAG = { dim: 'dim', bright: 'bright', split: 'partly', var: 'varies', poly: 'both', clonal: 'one only' };
   const carries = lv => lv && lv !== '-';
   const cellMarkers = id => Object.keys(MARKERS).filter(mk => !MARKERS[mk].scatter && carries(BY[id].m[mk])).map(mk => ({ kind: 'mark', key: mk, lv: BY[id].m[mk] }));
-  const markerCells = mk => cellPool().filter(id => carries(BY[id].m[mk])).map(id => ({ kind: 'cell', key: id, lv: BY[id].m[mk] }));
+  // every cell in the catalog, whatever the quiz is set to; normal ones first, under their own headings
+  const markerCells = mk => ENTITIES.filter(e => carries(e.m[mk])).map(e => ({ kind: 'cell', key: e.id, lv: e.m[mk], group: e.kind === 'normal' ? 'Normal' : 'Abnormal' }));
   // one answer list as a small table: name · full name · how it reads (in words), the asked one shaded and tagged
   function sectionHTML(title, items, hit, foot) {
+    let group = null;
     const rows = items.map(it => {
       const f = spelled(it.kind, it.key), tag = TAG[it.lv], asked = it.key === hit;
-      return `<tr${asked ? ' class="hit"' : ''}><th>${esc(nameOf(it.kind, it.key))}</th><td>${esc(f)}</td><td class="lv">${tag ? `<span class="pill">${tag}</span>` : ''}${asked ? '<span class="pill asked">asked</span>' : ''}</td></tr>`;
+      const head = it.group && it.group !== group ? `<tr class="grp"><th colspan="3">${(group = it.group)}</th></tr>` : '';
+      return `${head}<tr${asked ? ' class="hit"' : ''}><th>${esc(nameOf(it.kind, it.key))}</th><td>${esc(f)}</td><td class="lv">${tag ? `<span class="pill">${tag}</span>` : ''}${asked ? '<span class="pill asked">asked</span>' : ''}</td></tr>`;
     }).join('');
     return `<section class="qsec"><h4>${title}</h4>${items.length ? `<table class="qtab ${items[0].kind}">${rows}</table>` : '<p class="help">None of these cell types.</p>'}${foot ? `<p class="qfoot">${foot}</p>` : ''}</section>`;
   }
@@ -173,16 +176,15 @@
     const q = Q.q, mk = q.mk && MARKERS[q.mk];
     const note = mk && mk.note ? `<b>${esc(mk.name)}</b>: ${esc(mk.note)}` : '';
     const teach = q.id && BY[q.id].teach ? esc(BY[q.id].teach) : '';
-    const set = { normal: 'Normal cells', neoplasm: 'Abnormal cells', both: 'Cells' }[Q.cfg.cells];
     const onCell = (id, foot) => sectionHTML(`${esc(BY[id].name)} carries`, cellMarkers(id), q.mk, foot);
-    const withMark = (m, foot) => sectionHTML(`${set} with ${esc(MARKERS[m].name)}`, markerCells(m), q.id, foot);
+    const withMark = (m, foot) => sectionHTML(`Cells with ${esc(MARKERS[m].name)}`, markerCells(m), q.id, foot);
     let line, body;
-    if (q.kind === 'match') { line = `${withFull('cell', q.id)} is <b>${esc(mk.name)}${q.answer ? '+' : '−'}</b>`; body = onCell(q.id, teach) + withMark(q.mk, note); }
+    if (q.kind === 'match') { line = `${withFull('cell', q.id)} is <b>${esc(mk.name)}${q.answer ? '+' : '−'}</b>`; body = `<div class="qsecs two">${onCell(q.id, teach)}${withMark(q.mk, note)}</div>`; }
     else if (q.kind === 'cells') { line = `Carry ${withFull('mark', q.mk).replace(/,$/, '')}: <b>${q.correct.map(o => esc(BY[o].name)).join(', ')}</b>`; body = withMark(q.mk, note); }
     else { line = `${withFull('cell', q.id).replace(/,$/, '')} carries <b>${q.correct.map(o => esc(MARKERS[o].name)).join(', ')}</b>`; body = onCell(q.id, teach); }
     // auto-continue: a bar that runs down to the next question; press and hold (or scroll the answer) stops it
     const a = Q.auto, timer = a ? `<div class="qtimer${a.paused ? ' paused' : ''}" style="--secs:${a.secs}s"><div class="qtimer-track"><i></i></div><span>${a.paused ? `${ICON.pause}<b>Paused</b> · Next when you're ready` : `Next question in <span class="qsecs">${a.secs}</span> s · <b>hold to pause</b>`}</span></div>` : '';
-    return `<div class="qpop ${Q.right ? 'right' : 'wrong'}" role="status"><div class="qpop-in card"><div class="qpop-head">${Q.right ? ICON.yes : ICON.no}<b>${Q.right ? 'Right' : 'Not quite'}</b></div><div class="qpop-body"><p class="qpop-line">${line}</p>${body}</div>${timer}<button class="btn big qpop-next" data-qnext>Next</button></div></div>`;
+    return `<div class="qpop ${Q.right ? 'right' : 'wrong'}" role="status"><div class="qpop-in card${q.kind === 'match' ? ' wide' : ''}"><div class="qpop-head">${Q.right ? ICON.yes : ICON.no}<b>${Q.right ? 'Right' : 'Not quite'}</b></div><div class="qpop-body"><p class="qpop-line">${line}</p>${body}</div>${timer}<button class="btn big qpop-next" data-qnext>Next</button></div></div>`;
   }
   function draw() {
     hideFull();

@@ -13,6 +13,8 @@
    For the puzzle, dim/+/bright all read as positive (except CD45, where dim is its own reading:
    the blast gate); only negative / positive / split matter. Incidental dims that aren't a teaching
    point are left out on purpose, so a board never turns on trivia.
+   `frac`: for a split marker, the share of the population that is positive (default half): Tregs are
+   about a tenth of CD4 T cells.
    `excl` lists entities that flow alone can't fairly separate from this one, so the generator
    never puts both in the same board. */
 (function () {
@@ -53,7 +55,7 @@
     CD200: { name: 'CD200', full: 'OX-2', note: 'CLL bright, mantle cell negative' },
     FMC7: { name: 'FMC7', full: 'an epitope on CD20, named for its antibody clone', note: 'CLL negative, mantle cell positive' },
     CD11c: { name: 'CD11c', full: 'integrin alpha-X', note: 'hairy cell (with CD25, CD103); monocytes' },
-    CD25: { name: 'CD25', full: 'interleukin-2 receptor alpha chain (IL-2Rα)', note: 'hairy cell, ATLL' },
+    CD25: { name: 'CD25', full: 'interleukin-2 receptor alpha chain (IL-2Rα)', note: 'hairy cell, ATLL; normally a small subset of CD4 T cells (Tregs, activated cells)' },
     CD103: { name: 'CD103', full: 'integrin alpha-E', note: 'hairy cell' },
     CD38: { name: 'CD38', full: 'cyclic ADP-ribose hydrolase', note: 'plasma cells (bright)' },
     CD138: { name: 'CD138', full: 'syndecan-1', note: 'plasma cells' },
@@ -77,9 +79,9 @@
   const LYM = { fsc: 'low', ssc: 'low' };
   const E = [
     // ---- normal populations ----
-    { id: 'tcd4', kind: 'normal', lineage: 'T', name: 'CD4 T cell', long: 'Helper T cell', ...LYM,
-      m: { CD45: 'bright', CD3: '+', CD4: '+', CD2: '+', CD5: '+', CD7: '+', CD26: '+', CD55: '+', CD59: '+' },
-      teach: 'CD3+ CD4+: helper T cells, normally about twice as many as CD8 T cells.' },
+    { id: 'tcd4', kind: 'normal', lineage: 'T', name: 'CD4 T cell', long: 'Helper T cell', ...LYM, frac: { CD25: 0.1 },
+      m: { CD45: 'bright', CD3: '+', CD4: '+', CD2: '+', CD5: '+', CD7: '+', CD26: '+', CD25: 'split', CD55: '+', CD59: '+' },
+      teach: 'CD3+ CD4+: helper T cells, normally about twice as many as CD8 T cells. A small CD25 bright subset are regulatory T cells (FOXP3+); activated T cells gain CD25 too.' },
     { id: 'tcd8', kind: 'normal', lineage: 'T', name: 'CD8 T cell', long: 'Cytotoxic T cell', ...LYM,
       m: { CD45: 'bright', CD3: '+', CD8: '+', CD2: '+', CD5: '+', CD7: '+', CD26: '+', CD55: '+', CD59: '+' },
       teach: 'CD3+ CD8+: cytotoxic T cells, MHC I restricted.' },
