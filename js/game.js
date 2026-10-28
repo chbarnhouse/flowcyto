@@ -13,11 +13,13 @@
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 
+  const APP_V = (/[?&]v=(\d+)/.exec((document.currentScript || {}).src || '') || [])[1] || 'dev'; // shown in Settings, to tell a stale copy
   const ICON = {
     hold: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.6" fill="currentColor"/><circle cx="8" cy="8" r="5.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2.2 2"/></svg>',
     no: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="var(--ink-2)" stroke-width="2.2" stroke-linecap="round"/></svg>',
     yes: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5" fill="var(--blue)" stroke="var(--ink)" stroke-width="1"/></svg>',
     maybe: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.6 5.8a2.4 2.4 0 1 1 3.3 2.2c-.6.3-.9.8-.9 1.4v.6" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round"/><circle cx="8" cy="12.9" r="1.2" fill="var(--gold)"/></svg>',
+    erase: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.8l3.7 3.7-6.4 6.4H3.9L2.4 11.4a1.2 1.2 0 0 1 0-1.7z M6 6.3l3.7 3.7 M7 12.9h6.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>',
     right: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 5" fill="none" stroke="var(--teal)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     wrong: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="var(--pink)" stroke-width="2.4" stroke-linecap="round"/></svg>',
     share: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 10V2.5M5.2 5L8 2.2 10.8 5M5 7.2H4a1 1 0 0 0-1 1V13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V8.2a1 1 0 0 0-1-1h-1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
@@ -47,7 +49,7 @@
   // ---------- storage (every access guarded: private windows may refuse) ----------
   const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || 'null') || d; } catch (e) { return d; } };
   const save = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* stats/prefs just don't persist */ } };
-  const prefs = Object.assign({ enlarge: 'hold', refOpen: 'hold', gscale: 1, plotRows: 2, crossedLast: false, cellAxis: 'rows', quizRight: 3, quizWrong: 0, abbrOpen: 'hold', autoCheck: false, timer: false, tours: {},
+  const prefs = Object.assign({ enlarge: 'hold', refOpen: 'hold', gscale: 1, plotRows: 2, crossedLast: false, cellAxis: 'rows', quizRight: 3, quizWrong: 0, abbrOpen: 'hold', autoCheck: false, timer: false, tours: {}, padTool: '',
     custom: { pops: 4, gating: false, choose: false, decoys: true, extra: true, ref: 'filled', spread: 'normal', pct: false, scratch: true, dx: 'choice' } }, load('flowcyto.prefs', {}));
   prefs.appearance = Object.assign({ mode: 'auto', light: 'default', dark: 'dark' }, prefs.appearance || {});
   prefs.custom = Object.assign({ scratch: true, dx: 'choice' }, prefs.custom);
@@ -663,8 +665,10 @@
     const P = S.P;
     let h = `<div class="ans-head"><h2>Scratchpad</h2>${refButton()}</div>`;
     if (gating()) h += `<p class="gstat">${S.gates.some(Boolean) ? `${plural(S.groups.length, 'group')}${S.extraGroups ? ` (+${S.extraGroups} too many to letter)` : ''}` : 'No gates yet: drag on a plot to place one'} · this tube has ${P.pops.length} populations</p>`;
-    else h += `<p class="sub">Give every population an identity; none is used twice${S.cfg.dx ? ', and exactly one is the abnormal clone' : ''}. Tap a cell: chosen, then ruled out, then maybe, then blank. Tap a letter to highlight it in every plot.</p>`;
+    else h += `<p class="sub">Give every population an identity; none is used twice${S.cfg.dx ? ', and exactly one is the abnormal clone' : ''}. Pick a tool and tap once, or with no tool tap a cell to cycle: chosen, ruled out, maybe, blank. Tap a letter to highlight it in every plot.</p>`;
     if (!S.cols.length) h += `<p class="empty">Choose which cell types to consider${S.cfg.dx ? ', including Abnormal (clone)' : ''}.</p>`;
+    // tools: tap once to set that mark (again to clear it); tap the lit tool again for no tool (multi-tap cycling)
+    if (play && S.cols.length) h += `<div class="seg tools" role="radiogroup" aria-label="Tap tool">${[['yes', 'Yes'], ['no', 'No'], ['maybe', 'Maybe'], ['erase', 'Erase']].map(([v, t]) => `<button role="radio" data-tool="${v}" aria-checked="${prefs.padTool === v}">${ICON[v]}<span>${t}</span></button>`).join('')}</div>`;
     const cell = (p, id) => { const m = S.marks[p.label + '|' + id]; return `<td class="${m || ''}"><button data-cell="${p.label}|${id}" ${play ? '' : 'disabled'} aria-label="${p.label}, ${esc(nameOf(id))}: ${m ? MARK_WORD[m] : 'blank'}">${m ? ICON[m] : ''}</button></td>`; };
     const colName = id => `<button class="colh${id === 'abn' ? ' abn' : ''}" data-colh="${id}" title="${esc(BY[id].long)}">${esc(nameOf(id))}</button>`;
     const popHead = p => { const c = S.checked[p.label]; return `${rowTag(p)}${c ? `<span class="rowmark ${c}">${ICON[c]}<span>${c}</span></span>` : ''}`; };
@@ -1106,10 +1110,13 @@
     if (fc) { const slot = rows().find(p => p.label === fc.dataset.focus).slot; S.focus = S.focus === slot ? null : slot; drawPlots(); return drawPanel(); }
     const crw = ev.target.closest('[data-crow]');
     if (crw) { pushUndo(); S.cloneRow = S.cloneRow === crw.dataset.crow ? null : crw.dataset.crow; S.msg = null; drawPlots(); return drawPanel(); }
+    const tl = ev.target.closest('[data-tool]');
+    if (tl) { setPref('padTool', prefs.padTool === tl.dataset.tool ? '' : tl.dataset.tool); return drawPanel(); }
     const cell = ev.target.closest('[data-cell]');
     if (cell) {
       pushUndo();
-      const [row, id] = cell.dataset.cell.split('|'), key = row + '|' + id, next = cycle(S.marks[key]);
+      const [row, id] = cell.dataset.cell.split('|'), key = row + '|' + id, tool = prefs.padTool;
+      const next = !tool ? cycle(S.marks[key]) : tool === 'erase' || S.marks[key] === tool ? undefined : tool;
       if (next === 'yes') for (const k of Object.keys(S.marks)) {
         const [r2, i2] = k.split('|');
         if (S.marks[k] === 'yes' && r2 !== 'dx' && (r2 === row || i2 === id)) { delete S.marks[k]; if (r2 !== row) delete S.checked[r2]; } // one per row, one per column
@@ -1328,6 +1335,7 @@
     h += `<div class="set-row"><div><b>Appearance</b><span>This device only.</span></div><div class="seg" role="radiogroup">${[['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark']].map(([v, t]) => `<button role="radio" data-theme-set="mode" data-v="${v}" aria-checked="${a.mode === v}">${t}</button>`).join('')}</div></div>`;
     h += `<div class="set-row themes"><div><b>Light theme</b></div><div class="theme-row" role="radiogroup">${themeChoice('light', 'default', 'Default')}${themeChoice('light', 'light', 'Light')}</div></div>`;
     h += `<div class="set-row themes"><div><b>Dark theme</b></div><div class="theme-row" role="radiogroup">${themeChoice('dark', 'dark', 'Dark')}${themeChoice('dark', 'black', 'Black')}</div></div>`;
+    h += `<p class="set-ver">Version ${APP_V} · ${esc(location.host || 'local file')}</p>`;
     dlg.innerHTML = h;
     if (!dlg.open) dlg.showModal();
   }
