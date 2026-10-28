@@ -503,3 +503,25 @@ html, body { touch-action: manipulation; }
 .clearx .ic { width: 12px; height: 12px; }
 .zoom-btns { display: flex; gap: 8px; }
 .zoom-btns .ic { width: 16px; height: 16px; }
+
+/* ---------- quiz: full names and full answers ---------- */
+.quiz { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.quiz .abbr { cursor: pointer; text-decoration: underline dotted; text-decoration-thickness: 2px; text-underline-offset: .16em; text-decoration-color: color-mix(in srgb, currentColor 55%, transparent); }
+.holdtip.fulltip { border-color: var(--blue); padding: 12px 14px; }
+.holdtip.fulltip b { font-size: 18px; }
+.holdtip.fulltip span .fullname { font-size: 17px; color: var(--ink); margin-top: 3px; }
+.holdtip.fulltip span span { font-size: 14px; }
+.qrow > div { flex: 1 1 200px; }
+.qrow > div b { display: block; }
+.qrow > div span { display: block; color: var(--muted); font-size: 14px; margin-top: 2px; }
+.qpop-in { max-height: calc(100dvh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
+.qpop-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; -webkit-user-select: text; user-select: text; }
+.qpop-line .full, .qpop .help .full { font-weight: 500; color: var(--ink-2); }
+.qlist-h { margin: 6px 0 0; font-size: 15px; color: var(--ink); }
+.qlist { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px 12px; }
+.qlist li { display: flex; flex-direction: column; padding: 4px 0 4px 8px; border-left: 3px solid var(--line); min-width: 0; }
+.qlist li.hit { border-left: 3px solid var(--ink); }
+.qlist li.hit b::after { content: ' · asked'; font-weight: 600; font-size: 13px; color: var(--ink-2); }
+.qlist b { font-size: 16px; color: var(--ink); }
+.qlist b i { font-style: normal; font-weight: 600; font-size: 13px; color: var(--ink-2); }
+.qlist span { font-size: 13px; color: var(--ink-2); line-height: 1.25; }

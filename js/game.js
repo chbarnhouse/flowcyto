@@ -46,7 +46,7 @@
   // ---------- storage (every access guarded: private windows may refuse) ----------
   const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || 'null') || d; } catch (e) { return d; } };
   const save = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* stats/prefs just don't persist */ } };
-  const prefs = Object.assign({ enlarge: 'hold', refOpen: 'hold', gscale: 1, plotRows: 2, crossedLast: false, cellAxis: 'rows', quizRight: 3, quizWrong: 0, autoCheck: false, timer: false, tours: {},
+  const prefs = Object.assign({ enlarge: 'hold', refOpen: 'hold', gscale: 1, plotRows: 2, crossedLast: false, cellAxis: 'rows', quizRight: 3, quizWrong: 0, abbrOpen: 'hold', autoCheck: false, timer: false, tours: {},
     custom: { pops: 4, gating: false, choose: false, decoys: true, extra: true, ref: 'filled', spread: 'normal', pct: false, scratch: true, dx: 'choice' } }, load('flowcyto.prefs', {}));
   prefs.appearance = Object.assign({ mode: 'auto', light: 'default', dark: 'dark' }, prefs.appearance || {});
   prefs.custom = Object.assign({ scratch: true, dx: 'choice' }, prefs.custom);
@@ -1313,7 +1313,9 @@
       if (!refFilled()) h += `<div class="set-row"><div><b>Reference</b><span>${left ? `Fill it in from the key. Counts as ${plural(left, 'peek')}.` : 'Already filled in.'}</span></div><button class="btn" data-fill ${left ? '' : 'disabled'}>Fill in from the key</button></div>`;
     } else {
       h += sec('Markers quiz');
-      h += `<div class="set-row qset"><div><b>Questions</b><span>At least one kind stays on.</span></div>${FC.markers.modeHTML()}</div>`;
+      h += `<div class="set-row qset"><div><b>Questions</b><span>At least one kind stays on.</span></div>${FC.markers.kindsHTML()}</div>`;
+      h += `<div class="set-row"><div><b>Cell types</b><span>Normal cells, abnormal ones (neoplasms and clones), or both. The answers list the same ones.</span></div>${FC.markers.cellsHTML()}</div>`;
+      h += `<div class="set-row"><div><b>Full names</b><span>Abbreviations have a dotted underline. Press and hold one (slide to Keep it open to leave it up), or tap it. Holding a choice always shows its full name without picking it.</span></div>${seg('abbrOpen', [['hold', 'Press and hold'], ['tap', 'Tap']])}</div>`;
       const secs = [[0, 'Off'], [1, '1 s'], [2, '2 s'], [3, '3 s'], [5, '5 s']];
       h += `<div class="set-row"><div><b>Next question after a right answer</b><span>Off: wait for Next.</span></div>${seg('quizRight', secs)}</div>`;
       h += `<div class="set-row"><div><b>Next question after a wrong answer</b><span>Off: wait for Next, so you can read the correction.</span></div>${seg('quizWrong', secs)}</div>`;
@@ -1424,7 +1426,7 @@
   addEventListener('resize', () => { if (tour) showTourStep(); });
 
   FC.state = () => S; // for tests and the console
-  FC.prefs = prefs; FC.openSettings = openSettings; // the Markers quiz shares them
+  FC.prefs = prefs; FC.openSettings = openSettings; FC.ICON = ICON; FC.holdTip = holdTip; // the Markers quiz shares them
   applyTheme();
   route();
 })();
