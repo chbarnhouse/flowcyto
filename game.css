@@ -78,10 +78,15 @@ html.in-game, html.in-game body { background: var(--card); }
 .lgrid td.no { background: var(--sunk); }
 .lgrid td.yes { background: var(--blue-bg); }
 .lgrid td.maybe { background: var(--gold-bg); }
-/* scratchpad tap tools: icon + word, lit with the usual segmented ring */
-.seg.tools { display: flex; width: max-content; max-width: 100%; margin: 4px 0 8px; }
-.seg.tools button { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; }
-.seg.tools .ic { width: 15px; height: 15px; }
+/* scratchpad tap tools: symbols only (named by aria-label and title), lit with the usual segmented ring */
+.seg.tools { margin-right: auto; }
+.seg.tools button { display: inline-grid; place-items: center; min-width: 34px; min-height: 34px; padding: 0 6px; }
+.seg.tools .ic { width: 17px; height: 17px; }
+@media (max-width: 900px) {
+  .ans-head.has-tools h2 { display: none; }
+  .seg.tools button { min-width: 44px; min-height: 40px; }
+}
+@media (max-width: 380px) { .seg.tools button { min-width: 40px; } .ans-head.has-tools { gap: 6px; } .ans-head.has-tools .refbtn { padding: 6px 10px; } }
 .set-ver { margin: 18px 0 4px; font-size: var(--fs-xs); color: var(--muted); text-align: center; }
 .lgrid tr.focus th { color: var(--blue); text-decoration: underline; text-underline-offset: 3px; }
 .rowmark { display: inline-flex; gap: 3px; align-items: center; font-size: var(--fs-xs); font-weight: 700; margin-left: 4px; }

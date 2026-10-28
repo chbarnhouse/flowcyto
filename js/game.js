@@ -663,12 +663,13 @@
   const refButton = () => `<button class="refbtn" id="refBtn">${ICON.book}<span>Reference</span></button>`;
   function scratchHTML(play) {
     const P = S.P;
-    let h = `<div class="ans-head"><h2>Scratchpad</h2>${refButton()}</div>`;
+    // tools (symbols only): tap once to set that mark (again to clear it); tap the lit tool again for no tool (multi-tap cycling).
+    // They share the title's row; on phones they replace the title.
+    const tools = play && S.cols.length ? `<div class="seg tools" role="radiogroup" aria-label="Tap tool">${[['yes', 'Yes'], ['no', 'No'], ['maybe', 'Maybe'], ['erase', 'Erase']].map(([v, t]) => `<button role="radio" data-tool="${v}" aria-checked="${prefs.padTool === v}" aria-label="${t}" title="${t}">${ICON[v]}</button>`).join('')}</div>` : '';
+    let h = `<div class="ans-head${tools ? ' has-tools' : ''}"><h2>Scratchpad</h2>${tools}${refButton()}</div>`;
     if (gating()) h += `<p class="gstat">${S.gates.some(Boolean) ? `${plural(S.groups.length, 'group')}${S.extraGroups ? ` (+${S.extraGroups} too many to letter)` : ''}` : 'No gates yet: drag on a plot to place one'} · this tube has ${P.pops.length} populations</p>`;
     else h += `<p class="sub">Give every population an identity; none is used twice${S.cfg.dx ? ', and exactly one is the abnormal clone' : ''}. Pick a tool and tap once, or with no tool tap a cell to cycle: chosen, ruled out, maybe, blank. Tap a letter to highlight it in every plot.</p>`;
     if (!S.cols.length) h += `<p class="empty">Choose which cell types to consider${S.cfg.dx ? ', including Abnormal (clone)' : ''}.</p>`;
-    // tools: tap once to set that mark (again to clear it); tap the lit tool again for no tool (multi-tap cycling)
-    if (play && S.cols.length) h += `<div class="seg tools" role="radiogroup" aria-label="Tap tool">${[['yes', 'Yes'], ['no', 'No'], ['maybe', 'Maybe'], ['erase', 'Erase']].map(([v, t]) => `<button role="radio" data-tool="${v}" aria-checked="${prefs.padTool === v}">${ICON[v]}<span>${t}</span></button>`).join('')}</div>`;
     const cell = (p, id) => { const m = S.marks[p.label + '|' + id]; return `<td class="${m || ''}"><button data-cell="${p.label}|${id}" ${play ? '' : 'disabled'} aria-label="${p.label}, ${esc(nameOf(id))}: ${m ? MARK_WORD[m] : 'blank'}">${m ? ICON[m] : ''}</button></td>`; };
     const colName = id => `<button class="colh${id === 'abn' ? ' abn' : ''}" data-colh="${id}" title="${esc(BY[id].long)}">${esc(nameOf(id))}</button>`;
     const popHead = p => { const c = S.checked[p.label]; return `${rowTag(p)}${c ? `<span class="rowmark ${c}">${ICON[c]}<span>${c}</span></span>` : ''}`; };
