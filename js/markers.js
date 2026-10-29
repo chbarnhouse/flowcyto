@@ -233,7 +233,8 @@
     Q.score = 0; Q.answered = 0; Q.streak = 0;
     setup();
   }
-  function close() { $('#quiz').hidden = true; hideFull(); CT.use(null); }
+  // leaving the Quizzes ends their one-off content
+  function close() { $('#quiz').hidden = true; hideFull(); CT.use(null); if (Q.cfg.content) { Q.cfg.content = null; save('flowcyto.markers', Q.cfg); } }
   const bar = () => `<header class="bar"><div class="bar-in"><button class="iconbtn" data-qmenu aria-label="Main menu">${ICON.back}<span>Menu</span></button><div class="gtitle"><b>Quizzes</b><span>${Q.answered ? `${Q.score} of ${Q.answered} · streak ${Q.streak} · best ${best()}` : `best streak ${best()}`}</span></div><span class="bar-btns"><button class="iconbtn" data-qmaster aria-label="Master reference">${FC.master.ICON}<span>Reference</span></button><button class="iconbtn" data-qsettings aria-label="Settings">${ICON.gear}<span>Settings</span></button></span></div></header>`;
   // the quiz's own settings: shown on the start screen and at the top of Settings
   const chipOf = (attr, on, label) => `<button class="qchip" ${attr} aria-pressed="${on}">${on ? ICON.yes : '<span class="ic"></span>'}<span>${label}</span></button>`;

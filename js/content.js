@@ -6,7 +6,8 @@
    Scatter and CD45 always stay on: every board is gated on them. Saved in localStorage
    (flowcyto.content). Shown as the Content tab of Settings.
    Those are the defaults. The Quizzes and Custom boards can each keep their own content instead (their
-   Advanced section): a scope whose override is null reads the defaults. `use(scope)` says whose content
+   Advanced section), one-off: the Quizzes' goes when you leave them, Custom's when the sheet opens
+   afresh. A scope whose override is null reads the defaults. `use(scope)` says whose content
    the app is reading right now (the Quizzes' while a quiz is open); a board snapshots its own at the start. */
 (function () {
   'use strict';
@@ -122,8 +123,9 @@
     const own = SCOPES[sc].get();
     const state = own ? `Own content: ${esc(summary(own, sc === 'quiz'))}` : `Your defaults (Settings → Content): ${esc(summary(DEF, sc === 'quiz'))}`;
     let h = `<details class="ct-adv" data-ctscope="${sc}" ${advOpen[sc] ? 'open' : ''}><summary><span class="ct-adv-t"><b>Advanced</b><span>${state}</span></span></summary><div class="ct-adv-in">`;
-    h += own ? `<div class="set-row"><div><b>Content for ${what}</b><span>Used instead of your defaults until you switch back.</span></div><button class="btn" data-ctdefaults>Use my defaults</button></div>${bodyHTML('', sc)}`
-      : `<div class="set-row"><div><b>Content for ${what}</b><span>${what[0].toUpperCase() + what.slice(1)} use your defaults. Give them their own level and cell types, markers${sc === 'quiz' ? ' and lesions' : ''} instead; your defaults stay as they are.</span></div><button class="btn" data-ctown>Set their own</button></div>`;
+    const howLong = sc === 'quiz' ? 'For this visit to Quizzes only: leaving them puts your defaults back.' : 'For boards started from this sheet: opening Custom again starts from your defaults.';
+    h += own ? `<div class="set-row"><div><b>Content for ${what}</b><span>${howLong}</span></div><button class="btn" data-ctdefaults>Use my defaults</button></div>${bodyHTML('', sc)}`
+      : `<div class="set-row"><div><b>Content for ${what}</b><span>${what[0].toUpperCase() + what.slice(1)} use your defaults. Give them their own level and cell types, markers${sc === 'quiz' ? ' and lesions' : ''} this once; your defaults stay as they are.</span></div><button class="btn" data-ctown>Set their own</button></div>`;
     return h + '</div></details>';
   }
   const keysOf = sel => { const [s, g] = sel.split('.'); const sec = SECTIONS.find(x => x.id === s); return g ? sec.groups.find(x => x[0] === g)[2] : sec.groups.flatMap(x => x[2]); };

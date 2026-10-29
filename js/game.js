@@ -174,6 +174,8 @@
   // ---------- custom level ----------
   const csheet = $('#acts');
   function openCustom() {
+    // opened afresh, Custom starts from your default content (its own is one-off)
+    if (!csheet.open || csheet.dataset.kind !== 'custom') { if (prefs.custom.content) { prefs.custom.content = null; setPref('custom', prefs.custom); } }
     const c = prefs.custom;
     const choice = c.choose ? 'choose' : c.decoys ? 'decoys' : 'present';
     const seg = (k, opts, cur = c[k]) => `<div class="seg" role="radiogroup">${opts.map(([v, t]) => `<button role="radio" data-cset="${k}" data-v="${v}" aria-checked="${String(cur) === String(v)}">${t}</button>`).join('')}</div>`;
