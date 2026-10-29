@@ -1320,63 +1320,56 @@
 
   // ---------- settings ----------
   const dlg = $('#settings');
+  /* Tabs: the mode's own settings first (the puzzles and the Quizzes on the menu; just this board's, or
+     just the Quizzes', in play), then Content and App. The tab picked stays while Settings is open. */
+  let setTab = null;
   function openSettings() {
     const seg = (k, opts) => `<div class="seg" role="radiogroup">${opts.map(([v, t]) => `<button role="radio" data-pref="${k}" data-v="${v}" aria-checked="${String(prefs[k]) === String(v)}">${t}</button>`).join('')}</div>`;
-    let h = `<div class="set-head"><h2 tabindex="-1" autofocus>Settings</h2><button class="iconbtn" data-close aria-label="Close settings">${ICON.close}</button></div>`;
-    // the mode's own settings first (the puzzles, or the Quizzes), then content and the app's
-    const quiz = !$('#quiz').hidden, sec = t => `<h3 class="set-sec">${t}</h3>`;
-    setPage = 'main';
-    if (!quiz) {
-      if (!S) h += sec('Puzzles');
+    const quiz = !$('#quiz').hidden;
+    const tabs = [...(quiz ? [] : [['puzzles', S ? 'Puzzle' : 'Puzzles']]), ...(S ? [] : [['quizzes', 'Quizzes']]), ['content', 'Content'], ['app', 'App']];
+    if (!dlg.open || !tabs.some(t => t[0] === setTab)) setTab = tabs[0][0];
+    let h = `<div class="set-head"><div class="set-title"><h2 tabindex="-1" autofocus>Settings</h2><button class="iconbtn" data-close aria-label="Close settings">${ICON.close}</button></div>
+      <div class="set-tabs" role="tablist">${tabs.map(([k, t]) => `<button role="tab" data-settab="${k}" aria-selected="${setTab === k}">${t}</button>`).join('')}</div></div>`;
+    if (setTab === 'puzzles') {
       h += `<div class="set-row"><div><b>Plot rows</b><span>Plots sit in a strip that scrolls sideways, in one row or two.</span></div>${seg('plotRows', [[1, 'One'], [2, 'Two']])}</div>`;
       h += `<div class="set-row"><div><b>Crossed-out plots</b><span>Hold a plot and slide to Cross it out once you've read it.</span></div>${seg('crossedLast', [[false, 'Stay in place'], [true, 'Move to the end']])}</div>`;
-      h += `<div class="set-row"><div><b>Cell types</b><span>Where the cell types sit in both the scratchpad and the reference.</span></div>${seg('cellAxis', [['rows', 'Down the side'], ['cols', 'Across the top']])}</div>`;
+      h += `<div class="set-row"><div><b>Grid layout</b><span>Where the cell types sit in the scratchpad and the reference. (Which cell types appear is under Content.)</span></div>${seg('cellAxis', [['rows', 'Down the side'], ['cols', 'Across the top']])}</div>`;
       h += `<div class="set-row"><div><b>Grid size</b><span>Scratchpad, reference and diagnosis text and cells.</span></div>${seg('gscale', [[0.85, 'Small'], [1, 'Medium'], [1.2, 'Large'], [1.4, 'Larger']])}</div>`;
       h += `<div class="set-row"><div><b>Enlarge a plot</b><span>Press and hold shows it while your finger is down; tap opens it until you tap again. On gated levels a tap always opens it, so you can place its gate.</span></div>${seg('enlarge', [['hold', 'Press and hold'], ['tap', 'Tap']])}</div>`;
       h += `<div class="set-row"><div><b>Open the reference</b><span>For the read-only reference. When you fill it in yourself it always opens on a tap.</span></div>${seg('refOpen', [['hold', 'Press and hold'], ['tap', 'Tap']])}</div>`;
       h += `<div class="set-row"><div><b>Timer</b><span>Shows the clock while you play and your best time per level. Times are kept either way.</span></div>${seg('timer', [[false, 'Off'], [true, 'On']])}</div>`;
       h += `<div class="set-row"><div><b>Yes rules out its row and column</b><span>Choosing an identity crosses out the rest of its row and column, since each population has one identity and none is used twice. Take the choice away and those cells go back to what they were.</span></div>${seg('autoNo', [[true, 'On'], [false, 'Off']])}</div>`;
       h += `<div class="set-row"><div><b>Auto-check</b><span>Marks each choice right or wrong as you make it. A wrong choice counts as a mistake.</span></div>${seg('autoCheck', [[false, 'Off'], [true, 'On']])}</div>`;
-    }
-    if (S) {
+      if (S) {
       const left = S.refs.filter(id => !S.peeks.has(id)).length;
       h += `<div class="set-row"><div><b>How to play</b><span>A short walk-through on this board.</span></div><button class="btn" data-tour>Show me</button></div>`;
       if (!refFilled()) h += `<div class="set-row"><div><b>Reference</b><span>${left ? `Fill it in from the key. Counts as ${plural(left, 'peek')}.` : 'Already filled in.'}</span></div><button class="btn" data-fill ${left ? '' : 'disabled'}>Fill in from the key</button></div>`;
-    } else {
-      h += sec('Quizzes');
+      }
+    } else if (setTab === 'quizzes') {
       h += `<div class="set-row qset"><div><b>Topics</b><span>Any mix; at least one stays on.</span></div>${FC.markers.topicsHTML()}</div>`;
       h += `<div class="set-row qset"><div><b>Answer formats</b><span>Any mix; at least one stays on.</span></div>${FC.markers.kindsHTML()}</div>`;
       h += `<div class="set-row qset"><div><b>Directions</b><span>For every format but swipe. At least one stays on.</span></div>${FC.markers.dirsHTML()}</div>`;
-      h += `<div class="set-row"><div><b>Cell types</b><span>For the markers topic, which cells the questions ask about: normal, abnormal (neoplasms and clones), or both. The answers always list every cell, normal and abnormal under their own headings.</span></div>${FC.markers.cellsHTML()}</div>`;
       h += `<div class="set-row"><div><b>Full names</b><span>Abbreviations have a dotted underline. Press and hold one (slide to Keep it open to leave it up), or tap it. Holding a choice always shows its full name without picking it.</span></div>${seg('abbrOpen', [['hold', 'Press and hold'], ['tap', 'Tap']])}</div>`;
       const secs = [[0, 'Off'], [1, '1 s'], [2, '2 s'], [3, '3 s'], [5, '5 s']];
       h += `<div class="set-row"><div><b>Next question after a right answer</b><span>Off: wait for Next. A bar counts down; press and hold the answer (or scroll it) to pause.</span></div>${seg('quizRight', secs)}</div>`;
       h += `<div class="set-row"><div><b>Next question after a wrong answer</b><span>Off: wait for Next, so you can read the correction.</span></div>${seg('quizWrong', secs)}</div>`;
-    }
-    h += sec('Content');
-    h += `<div class="set-row"><div><b>Level</b><span>Boards, quizzes and the master reference. Each level includes the ones before it.</span></div>${FC.content.levelSeg()}</div>`;
-    h += `<div class="set-row"><div><b>Cell types, markers and lesions</b><span>${esc(FC.content.summary())}</span></div><button class="btn" data-ctopen>Choose</button></div>`;
-    h += sec('App');
+    } else if (setTab === 'content') {
+      h += FC.content.bodyHTML(`<div class="set-row"><div><b>Marker questions ask about</b><span>In the Quizzes' markers topic: normal cells, abnormal ones (neoplasms and clones), or both. The answers always list every cell that's on.</span></div>${FC.markers.cellsHTML()}</div>`);
+    } else {
     const a = prefs.appearance;
     h += `<div class="set-row"><div><b>Appearance</b><span>This device only.</span></div><div class="seg" role="radiogroup">${[['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark']].map(([v, t]) => `<button role="radio" data-theme-set="mode" data-v="${v}" aria-checked="${a.mode === v}">${t}</button>`).join('')}</div></div>`;
     h += `<div class="set-row themes"><div><b>Light theme</b></div><div class="theme-row" role="radiogroup">${themeChoice('light', 'default', 'Default')}${themeChoice('light', 'light', 'Light')}</div></div>`;
     h += `<div class="set-row themes"><div><b>Dark theme</b></div><div class="theme-row" role="radiogroup">${themeChoice('dark', 'dark', 'Dark')}${themeChoice('dark', 'black', 'Black')}</div></div>`;
     h += `<p class="set-ver">Version ${APP_V} · ${esc(location.host || 'local file')}</p>`;
+    }
+    const y = dlg.open ? dlg.scrollTop : 0;
     dlg.innerHTML = h;
-    if (!dlg.open) dlg.showModal();
-  }
-  // Settings → Content: its own page in the same dialog
-  let setPage = 'main';
-  function openContent(keepScroll) {
-    const y = dlg.scrollTop;
-    setPage = 'content'; dlg.innerHTML = FC.content.pageHTML();
-    if (keepScroll) dlg.scrollTop = y; else { dlg.scrollTop = 0; dlg.querySelector('h2').focus({ preventScroll: true }); }
+    if (!dlg.open) dlg.showModal(); else dlg.scrollTop = y;
   }
   dlg.addEventListener('click', ev => {
     if (ev.target === dlg || ev.target.closest('[data-close]')) return dlg.close();
-    if (ev.target.closest('[data-ctopen]')) return openContent();
-    if (ev.target.closest('[data-ctback]')) return openSettings();
-    if (FC.content.click(ev, () => setPage === 'content' ? openContent(true) : openSettings())) return;
+    const tb = ev.target.closest('[data-settab]'); if (tb) { setTab = tb.dataset.settab; dlg.scrollTop = 0; return openSettings(); }
+    if (FC.content.click(ev, openSettings)) return;
     const t = ev.target.closest('[data-theme-set]');
     if (t) {
       const a = prefs.appearance, key = t.dataset.themeSet;

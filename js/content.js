@@ -4,7 +4,7 @@
    includes the ones before it), then any item turned on or off by hand, singly or a whole group at a
    time. An item is on when its own switch says so, else when its level is within the chosen one.
    Scatter and CD45 always stay on: every board is gated on them. Saved in localStorage
-   (flowcyto.content). Shown as a page inside Settings. */
+   (flowcyto.content). Shown as the Content tab of Settings. */
 (function () {
   'use strict';
   const FC = window.FC;
@@ -50,7 +50,6 @@
   // ---------- the page ----------
   const ICON = {
     check: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-    back: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3L5 8l5 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   };
   const levelName = n => LEVELS.find(l => l[0] === n)[1];
   const counts = () => SECTIONS.map(s => { const ks = s.groups.flatMap(g => g[2]); return [ks.filter(isOn).length, ks.length]; });
@@ -59,7 +58,11 @@
     const [e, m, g] = counts(), hand = Object.keys(C.on).length;
     return `${levelName(C.level)}${hand ? ` plus ${hand} change${hand === 1 ? '' : 's'} by hand` : ''} · ${e[0]} of ${e[1]} cell types and diseases · ${m[0]} of ${m[1]} markers · ${g[0]} of ${g[1]} lesions`;
   }
-  const levelSeg = () => `<div class="seg ct-levels" role="radiogroup" aria-label="Level">${LEVELS.map(([n, t]) => `<button role="radio" data-ctlevel="${n}" aria-checked="${C.level === n}">${t}</button>`).join('')}</div>`;
+  /* The level as a track of stops: every stop up to the chosen one is filled (it's included), the chosen
+     one is ringed with a check, the ones past it are hollow. Shape and fill carry it, not color. */
+  const levelTrack = () => `<div class="ct-track" role="radiogroup" aria-label="Level" style="--n:${LEVELS.length};--at:${C.level - 1}">${LEVELS.map(([n, long, short]) =>
+    `<button role="radio" data-ctlevel="${n}" aria-checked="${C.level === n}" aria-label="${long}" class="${n <= C.level ? 'in' : ''}"><span class="dot">${C.level === n ? ICON.check : ''}</span><span class="lbl">${short}</span></button>`).join('')}</div>`;
+  const levelWords = () => C.level === 1 ? 'Step 1 material only.' : `Everything from Step 1 through ${levelName(C.level).replace('Heme fellowship', 'heme fellowship').replace('Residency', 'residency')}.`;
   // a clone that reads like a normal cell on the markers that are on: says which markers would bring it back
   function offBoards() {
     if (!FC.lookalikes) return '';
@@ -75,11 +78,11 @@
     const tags = [lv > 1 ? levelName(lv) : '', d && d.kind === 'genetic' ? 'quiz only' : ''].filter(Boolean);
     return `<button class="mchip ct" data-ct="${esc(key)}" aria-pressed="${on}">${on ? ICON.check : '<span class="ic"></span>'}<span>${esc(nameOf(key))}</span>${tags.map(t => `<small class="ct-tag">${t}</small>`).join('')}</button>`;
   }
-  function pageHTML() {
-    let h = `<div class="set-head"><button class="iconbtn" data-ctback aria-label="Back to Settings">${ICON.back}<span>Settings</span></button><h2 tabindex="-1">Content</h2><span></span></div>`;
-    h += `<p class="help">What boards, quizzes and the master reference draw on. A board you're in the middle of keeps what it started with.</p>`;
-    h += `<div class="set-row"><div><b>Level</b><span>Each level includes the ones before it. Anything beyond Step 1 is tagged with its level.</span></div>${levelSeg()}</div>`;
+  // the Content tab: level, anything set by hand, `extra` (the Quizzes' cell types), then the lists
+  function bodyHTML(extra = '') {
+    let h = `<div class="set-row ct-level"><div><b>Level</b><span>For boards, quizzes and the master reference. ${levelWords()} Anything beyond Step 1 is tagged with its level. A board you're in the middle of keeps what it started with.</span></div>${levelTrack()}</div>`;
     const hand = Object.keys(C.on).length;
+    h += extra;
     if (hand) h += `<div class="set-row"><div><b>${hand} change${hand === 1 ? '' : 's'} by hand</b><span>Items you turned on or off yourself, whatever the level says.</span></div><button class="btn" data-ctreset>Match the level</button></div>`;
     for (const s of SECTIONS) {
       const ks = s.groups.flatMap(g => g[2]), n = ks.filter(isOn).length;
@@ -107,5 +110,5 @@
     return false;
   }
 
-  FC.content = { LEVELS, CORE, state: C, isOn, entOn, mkOn, lesOn, linkOn, allow, dis, summary, levelSeg, pageHTML, click, levelName, allKeys };
+  FC.content = { LEVELS, CORE, state: C, isOn, entOn, mkOn, lesOn, linkOn, allow, dis, summary, bodyHTML, click, levelName, allKeys };
 })();

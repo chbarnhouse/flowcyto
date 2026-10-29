@@ -694,7 +694,6 @@ html, body { touch-action: manipulation; }
 /* ---------- Settings → Content ---------- */
 .qrow.col { flex-direction: column; align-items: stretch; }
 .qrow.col > div { flex: none; }
-.seg.ct-levels { flex-wrap: wrap; }
 #settings .help { margin: 6px 0 0; font-size: var(--fs-xs); color: var(--muted); }
 .ct-sec { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 18px; padding-top: 10px; border-top: 1px solid var(--line); }
 .ct-sec .set-sec { margin: 0; }
@@ -708,3 +707,29 @@ html, body { touch-action: manipulation; }
 .mchip.ct[aria-pressed="false"] { color: var(--muted); }
 .ct-tag { font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 999px; border: 1px solid currentColor; opacity: .8; }
 .ct-note { margin: 8px 0 0; padding: 8px 10px; border-radius: 10px; background: var(--sunk); font-size: var(--fs-xs); }
+
+/* Settings tabs: the picked tab is bold with a bar under it (not color alone) */
+.set-head:has(.set-tabs) { flex-direction: column; align-items: stretch; padding-bottom: 0; }
+.set-title { display: flex; align-items: center; justify-content: space-between; }
+.set-tabs { display: flex; gap: 2px; margin: 6px -6px 0; overflow-x: auto; scrollbar-width: none; }
+.set-tabs button { flex: 1 0 auto; border: 0; background: none; font: inherit; font-size: var(--fs-sm); font-weight: 600; color: var(--muted); padding: 10px 12px 9px; border-bottom: 3px solid transparent; cursor: pointer; }
+.set-tabs button[aria-selected="true"] { color: var(--ink); font-weight: 800; border-bottom-color: var(--blue); }
+.set-tabs button:focus-visible { outline: 2px solid var(--blue); outline-offset: -4px; border-radius: 6px; }
+
+/* Content: the level as a track of stops */
+.set-row.ct-level { flex-direction: column; align-items: stretch; }
+.set-row.ct-level > div:first-child { flex: none; }
+.ct-track { position: relative; display: grid; grid-template-columns: repeat(var(--n), 1fr); margin-top: 6px; }
+.ct-track::before, .ct-track::after { content: ''; position: absolute; top: 17px; height: 4px; border-radius: 2px; left: calc(50% / var(--n)); }
+.ct-track::before { right: calc(50% / var(--n)); background: var(--line); }
+.ct-track::after { width: calc((100% - 100% / var(--n)) * var(--at) / (var(--n) - 1)); background: var(--blue); }
+.ct-track button { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; border: 0; background: none; padding: 4px 0; font: inherit; cursor: pointer; color: var(--muted); min-width: 0; }
+.ct-track .dot { display: grid; place-items: center; width: 22px; height: 22px; margin: 4px 0; border-radius: 50%; border: 2.5px solid var(--line); background: var(--card); }
+.ct-track button.in { color: var(--ink-2); }
+.ct-track button.in .dot { border-color: var(--blue); background: var(--blue); }
+.ct-track button[aria-checked="true"] { color: var(--ink); }
+.ct-track button[aria-checked="true"] .dot { width: 30px; height: 30px; margin: 0; background: var(--card); box-shadow: 0 0 0 3px var(--blue-bg); }
+.ct-track .dot .ic { width: 16px; height: 16px; color: var(--blue); }
+.ct-track .lbl { font-size: 12.5px; font-weight: 600; line-height: 1.15; text-align: center; overflow-wrap: anywhere; }
+.ct-track button[aria-checked="true"] .lbl { font-weight: 800; }
+.ct-track button:focus-visible .dot { outline: 2px solid var(--blue); outline-offset: 3px; }
