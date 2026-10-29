@@ -51,10 +51,12 @@
   // ---------- storage (every access guarded: private windows may refuse) ----------
   const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || 'null') || d; } catch (e) { return d; } };
   const save = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* stats/prefs just don't persist */ } };
-  const prefs = Object.assign({ enlarge: 'hold', refOpen: 'hold', gscale: 1, plotRows: 2, crossedLast: false, cellAxis: 'rows', quizRight: 3, quizWrong: 0, abbrOpen: 'hold', autoCheck: false, timer: false, tours: {}, padTool: '', autoNo: true,
+  const prefs = Object.assign({ enlarge: 'hold', refOpen: 'hold', gscale: 1, plotRows: 2, crossedLast: false, cellAxis: 'rows', quizRight: 3, quizWrong: 0, abbrOpen: 'hold', autoCheck: false, timer: false, tours: {}, startTool: '', autoNo: true,
     custom: { pops: 4, gating: false, choose: false, decoys: true, extra: true, ref: 'filled', spread: 'normal', pct: false, scratch: true, dx: 'choice' } }, load('flowcyto.prefs', {}));
   prefs.appearance = Object.assign({ mode: 'auto', light: 'default', dark: 'dark' }, prefs.appearance || {});
   prefs.custom = Object.assign({ scratch: true, dx: 'choice' }, prefs.custom);
+  // the tool picked used to be remembered across boards; now each board starts with Settings' Starting tool
+  if ('padTool' in prefs) { if (prefs.padTool && prefs.padTool !== 'erase' && !prefs.startTool) prefs.startTool = prefs.padTool; delete prefs.padTool; }
   const setPref = (k, v) => { prefs[k] = v; save('flowcyto.prefs', prefs); };
   /* Level changes keep their stats: 3→4 levels (old Hard became Extreme), 4→6 (old Medium is closest
      to the new Hard, old gated Hard to Expert), then the two modes merged into one game: each level's
@@ -204,8 +206,8 @@
     const refs0 = P.choose ? [] : [...P.pool.filter(id => id !== 'abn'), ...(P.cfg.dx === 'choice' ? P.dxPool : [])];
     S = { level, seed, P, cfg: P.cfg, custom, allow, marks: {}, checked: {}, wrongChecks: 0, hints: 0, peeks: new Set(), pad: {}, refRow: null,
       cols: P.choose ? [] : P.pool.slice(), refs: [...new Set(refs0)], typed: [], dxHint: 0,
-      focus: null, crossed: [], phase: P.cfg.scratch ? 'play' : 'dx', pctPick: null, msg: null, flash: null, elapsed: 0, t0: null, undo: [], why: null };
-    if (saved) Object.assign(S, { marks: saved.marks || {}, checked: saved.checked || {}, wrongChecks: saved.wrongChecks || 0, hints: saved.hints || 0, peeks: new Set(saved.peeks || []), master: !!saved.master, pad: saved.pad || {}, phase: saved.phase || S.phase, pctPick: saved.pctPick || null, msg: saved.msg || null, stats: saved.stats, elapsed: saved.elapsed || 0, cols: saved.cols || S.cols, refs: saved.refs || S.refs, typed: saved.typed || [], dxHint: saved.dxHint || 0, crossed: saved.crossed || [] });
+      tool: prefs.startTool || '', focus: null, crossed: [], phase: P.cfg.scratch ? 'play' : 'dx', pctPick: null, msg: null, flash: null, elapsed: 0, t0: null, undo: [], why: null };
+    if (saved) Object.assign(S, { marks: saved.marks || {}, checked: saved.checked || {}, wrongChecks: saved.wrongChecks || 0, hints: saved.hints || 0, peeks: new Set(saved.peeks || []), master: !!saved.master, pad: saved.pad || {}, phase: saved.phase || S.phase, pctPick: saved.pctPick || null, msg: saved.msg || null, stats: saved.stats, elapsed: saved.elapsed || 0, cols: saved.cols || S.cols, refs: saved.refs || S.refs, typed: saved.typed || [], dxHint: saved.dxHint || 0, crossed: saved.crossed || [], tool: saved.tool ?? S.tool });
     if (gating()) {
       S.gates = (saved && saved.gates) || P.plots.map(() => null); // nothing placed: the player sets every gate
       S.sigSlot = (saved && saved.sigSlot) || {}; S.slotSig = {};
@@ -252,7 +254,7 @@
   }
   function persist() {
     if (!S) return;
-    save('flowcyto.current', { level: S.level, seed: S.seed, custom: S.custom, allow: S.allow, marks: S.marks, checked: S.checked, wrongChecks: S.wrongChecks, hints: S.hints, peeks: [...S.peeks], master: !!S.master, pad: S.pad, cols: S.cols, refs: S.refs, typed: S.typed, dxHint: S.dxHint, phase: S.phase, pctPick: S.pctPick, msg: S.msg, stats: S.stats, gates: S.gates, sigSlot: S.sigSlot, cloneRow: S.cloneRow, crossed: S.crossed, elapsed: elapsedNow() });
+    save('flowcyto.current', { level: S.level, seed: S.seed, custom: S.custom, allow: S.allow, marks: S.marks, checked: S.checked, wrongChecks: S.wrongChecks, hints: S.hints, peeks: [...S.peeks], master: !!S.master, pad: S.pad, cols: S.cols, refs: S.refs, typed: S.typed, dxHint: S.dxHint, phase: S.phase, pctPick: S.pctPick, msg: S.msg, stats: S.stats, gates: S.gates, sigSlot: S.sigSlot, cloneRow: S.cloneRow, crossed: S.crossed, tool: S.tool, elapsed: elapsedNow() });
   }
 
   const shownPlots = () => S.P.plots.map(p => [p.x, p.y]);
@@ -673,7 +675,7 @@
     const P = S.P;
     // tools (symbols only): tap once to set that mark (again to clear it); tap the lit tool again for no tool (multi-tap cycling).
     // They share the title's row; on phones they replace the title.
-    const tools = play && S.cols.length ? `<div class="seg tools" role="radiogroup" aria-label="Tap tool">${[['yes', 'Yes'], ['no', 'No'], ['maybe', 'Maybe'], ['erase', 'Erase']].map(([v, t]) => `<button role="radio" data-tool="${v}" aria-checked="${prefs.padTool === v}" aria-label="${t}" title="${t}">${ICON[v]}</button>`).join('')}</div>` : '';
+    const tools = play && S.cols.length ? `<div class="seg tools" role="radiogroup" aria-label="Tap tool">${[['yes', 'Yes'], ['no', 'No'], ['maybe', 'Maybe'], ['erase', 'Erase']].map(([v, t]) => `<button role="radio" data-tool="${v}" aria-checked="${S.tool === v}" aria-label="${t}" title="${t}">${ICON[v]}</button>`).join('')}</div>` : '';
     let h = `<div class="ans-head${tools ? ' has-tools' : ''}"><h2>Scratchpad</h2>${tools}${refButton()}</div>`;
     if (gating()) h += `<p class="gstat">${S.gates.some(Boolean) ? `${plural(S.groups.length, 'group')}${S.extraGroups ? ` (+${S.extraGroups} too many to letter)` : ''}` : 'No gates yet: drag on a plot to place one'} · this tube has ${P.pops.length} populations</p>`;
     else h += `<p class="sub">Give every population an identity; none is used twice${S.cfg.dx ? ', and exactly one is the abnormal clone' : ''}. Pick a tool and tap once, or with no tool tap a cell to cycle: chosen, ruled out, maybe, blank. Tap a letter to highlight it in every plot.</p>`;
@@ -1131,11 +1133,11 @@
     const crw = ev.target.closest('[data-crow]');
     if (crw) { pushUndo(); S.cloneRow = S.cloneRow === crw.dataset.crow ? null : crw.dataset.crow; S.msg = null; drawPlots(); return drawPanel(); }
     const tl = ev.target.closest('[data-tool]');
-    if (tl) { setPref('padTool', prefs.padTool === tl.dataset.tool ? '' : tl.dataset.tool); return drawPanel(); }
+    if (tl) { S.tool = S.tool === tl.dataset.tool ? '' : tl.dataset.tool; persist(); return drawPanel(); }
     const cell = ev.target.closest('[data-cell]');
     if (cell) {
       pushUndo();
-      const [row, id] = cell.dataset.cell.split('|'), key = row + '|' + id, tool = prefs.padTool;
+      const [row, id] = cell.dataset.cell.split('|'), key = row + '|' + id, tool = S.tool;
       const next = !tool ? cycle(S.marks[key]) : tool === 'erase' || S.marks[key] === tool ? undefined : tool;
       if (next === 'yes') for (const k of Object.keys(S.marks)) {
         const [r2, i2] = k.split('|');
@@ -1339,6 +1341,7 @@
       h += `<div class="set-row"><div><b>Open the reference</b><span>For the read-only reference. When you fill it in yourself it always opens on a tap.</span></div>${seg('refOpen', [['hold', 'Press and hold'], ['tap', 'Tap']])}</div>`;
       h += `<div class="set-row"><div><b>Timer</b><span>Shows the clock while you play and your best time per level. Times are kept either way.</span></div>${seg('timer', [[false, 'Off'], [true, 'On']])}</div>`;
       h += `<div class="set-row"><div><b>Yes rules out its row and column</b><span>Choosing an identity crosses out the rest of its row and column, since each population has one identity and none is used twice. Take the choice away and those cells go back to what they were.</span></div>${seg('autoNo', [[true, 'On'], [false, 'Off']])}</div>`;
+      h += `<div class="set-row"><div><b>Starting tool</b><span>The scratchpad tool each new board starts with. None: each tap on a cell steps it Yes, No, Maybe, blank. Changing tools during a board doesn't change this.</span></div>${seg('startTool', [['', 'None'], ['yes', 'Yes'], ['no', 'No'], ['maybe', 'Maybe']])}</div>`;
       h += `<div class="set-row"><div><b>Auto-check</b><span>Marks each choice right or wrong as you make it. A wrong choice counts as a mistake.</span></div>${seg('autoCheck', [[false, 'Off'], [true, 'On']])}</div>`;
       if (S) {
       const left = S.refs.filter(id => !S.peeks.has(id)).length;
