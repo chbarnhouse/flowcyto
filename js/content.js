@@ -131,10 +131,10 @@
      or the defaults. Closed, it says which; it stays open or closed across redraws. */
   const advOpen = {};
   document.addEventListener('toggle', ev => { const d = ev.target; if (d.matches && d.matches('details.ct-adv')) advOpen[d.dataset.ctscope] = d.open; }, true);
-  function advancedHTML(sc, what) {
+  function advancedHTML(sc, what, title = 'Advanced') {
     const own = SCOPES[sc].get(), n = own ? nDiffs(own) : 0;
     const state = n ? `${n} change${n === 1 ? '' : 's'} from your defaults, for ${sc === 'quiz' ? 'this quiz' : 'these boards'} only` : 'Your defaults (Settings → Content)';
-    let h = `<details class="ct-adv" data-ctscope="${sc}" ${advOpen[sc] ? 'open' : ''}><summary><span class="ct-adv-t"><b>Advanced${n ? DOT : ''}</b><span>${state}</span></span></summary><div class="ct-adv-in">`;
+    let h = `<details class="ct-adv" data-ctscope="${sc}" ${advOpen[sc] ? 'open' : ''}><summary><span class="ct-adv-t"><b>${title}${n ? DOT : ''}</b><span>${state}</span></span></summary><div class="ct-adv-in">`;
     const howLong = sc === 'quiz' ? 'leaving Quizzes puts your defaults back' : 'opening Custom again starts from your defaults';
     h += `<div class="set-row"><div><b>Content for ${what}</b><span>Starts from your defaults in Settings → Content. Anything you change here is for ${sc === 'quiz' ? 'this quiz' : 'boards started from this sheet'} only and is marked with a dot; ${howLong}.</span></div>${n ? '<button class="btn" data-ctrevert="all">Revert all to default</button>' : ''}</div>`;
     return h + bodyHTML('', sc) + '</div></details>';

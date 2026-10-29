@@ -1363,7 +1363,8 @@
       const secs = [[0, 'Off'], [1, '1 s'], [2, '2 s'], [3, '3 s'], [5, '5 s']];
       h += `<div class="set-row"><div><b>Next question after a right answer</b><span>Off: wait for Next. A bar counts down; press and hold the answer (or scroll it) to pause.</span></div>${seg('quizRight', secs)}</div>`;
       h += `<div class="set-row"><div><b>Next question after a wrong answer</b><span>Off: wait for Next, so you can read the correction.</span></div>${seg('quizWrong', secs)}</div>`;
-      h += FC.content.advancedHTML('quiz', 'quizzes');
+      // during a quiz only (on the menu, Settings → Content is the defaults and the start screen has Advanced)
+      if (quiz) h += FC.content.advancedHTML('quiz', 'quizzes', 'This quiz\'s content');
     } else if (setTab === 'content') {
       if (FC.content.usingOwn()) h += '<p class="ct-note">This quiz uses its own content (Quizzes → Advanced). What you set here are your defaults.</p>';
       h += FC.content.bodyHTML(`<div class="set-row"><div><b>Quizzes ask about</b><span>${esc(FC.markers.cellsNote())} The answers always list every cell that's on.</span></div>${FC.markers.cellsHTML()}</div>`);
