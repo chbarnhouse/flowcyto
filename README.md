@@ -29,6 +29,10 @@ Then open http://localhost:8793. The URL hash names the board (`#pops/medium/123
 
 ## Files
 - `js/kb.js`: markers, normal populations, neoplasms (marker profiles, hallmarks, teaching lines), specimens, and the curated plot pairs.
+- `js/genetics.js`: translocations and mutations, the malignancies they go with (with a level per link), and pairs never asked.
+- `js/content.js`: Settings → Content: a level (Step 1 to heme fellowship) plus items turned on or off by hand, singly or by group. Boards, the Quizzes and the master reference read it.
+- `js/markers.js`: the Quizzes (markers, and translocations and mutations).
+- `js/master.js`: the master reference.
 - `js/gen.js`: seeded generator, uniqueness solver, sudoku-style clue removal, and event simulation.
 - `js/plot.js`: SVG dot plots. Each population has a shape, a letter badge and a CVD-safe color.
 - `js/game.js`: the game screen.

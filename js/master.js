@@ -30,16 +30,7 @@
 
   // ---------- catalog ----------
   const LINEAGES = [['T', 'T cell'], ['NK', 'NK cell'], ['B', 'B cell'], ['plasma', 'Plasma cell'], ['myeloid', 'Myeloid']];
-  const MGROUPS = [
-    ['scatter', 'Scatter', ['FSC', 'SSC']],
-    ['blast', 'General and blasts', ['CD45', 'CD34', 'CD117', 'TdT', 'HLA-DR']],
-    ['myeloid', 'Myeloid and monocyte', ['CD13', 'CD33', 'MPO', 'CD14', 'CD64', 'CD11b', 'CD15', 'CD16']],
-    ['t', 'T and NK', ['CD3', 'CD4', 'CD8', 'CD7', 'CD2', 'CD5', 'CD1a', 'CD26', 'CD56']],
-    ['b', 'B and hairy cell', ['CD19', 'CD20', 'CD22', 'CD10', 'CD23', 'CD200', 'FMC7', 'CD11c', 'CD25', 'CD103', 'LC']],
-    ['plasma', 'Plasma cell', ['CD38', 'CD138']],
-    ['mega', 'Megakaryocyte', ['CD41', 'CD61']],
-    ['pnh', 'GPI-anchored (PNH)', ['CD55', 'CD59']],
-  ];
+  const { MGROUPS } = FC;
   const GROUP_OF = Object.fromEntries(MGROUPS.flatMap(([g, , mks]) => mks.map(mk => [mk, g])));
   const ALL_MARKERS = MGROUPS.flatMap(g => g[2]).filter(mk => MARKERS[mk]);
   const CELLS = ENTITIES.filter(e => e.kind === 'normal' || e.kind === 'neoplasm');
@@ -79,8 +70,9 @@
   }
   function view() {
     const s = searched();
-    let rows = (s.cells || CELLS).filter(e => (e.kind === 'normal' ? M.normal : M.abnormal) && (!M.lins.length || M.lins.includes(e.lineage)));
-    let cols = (s.marks || ALL_MARKERS).filter(mk => !M.mgroups.length || M.mgroups.includes(GROUP_OF[mk]));
+    // Settings → Content decides what's in the catalog at all; the filters here narrow it further
+    let rows = (s.cells || CELLS).filter(e => FC.content.entOn(e.id) && (e.kind === 'normal' ? M.normal : M.abnormal) && (!M.lins.length || M.lins.includes(e.lineage)));
+    let cols = (s.marks || ALL_MARKERS).filter(mk => FC.content.mkOn(mk) && (!M.mgroups.length || M.mgroups.includes(GROUP_OF[mk])));
     if (M.hideEmpty && !s.marks) cols = cols.filter(mk => GROUP_OF[mk] === 'scatter' || rows.some(e => carries(e, mk)));
     if (M.onlyDiff) cols = cols.filter(mk => new Set(rows.map(e => reading(e, mk)[0])).size > 1);
     if (M.sort === 'az') rows = rows.slice().sort((a, b) => a.name.localeCompare(b.name));
@@ -154,7 +146,7 @@
   }
   const LEGEND = `<div class="mlegend"><span><b>++</b> bright</span><span><b>+</b> positive</span><span><b>dim</b></span><span class="part"><b>±</b> partly</span><span class="part"><b>var</b> varies</span><span><b>–</b> negative</span><span><b>κλ</b> both light chains · <b>κ|λ</b> one</span><span>${ICON.abn} abnormal</span></div>`;
 
-  const resultsHTML = (rows, cols) => `<div class="m-sum"><span>${rows.length} cell type${rows.length === 1 ? '' : 's'} · ${cols.length} marker${cols.length === 1 ? '' : 's'}</span>${nFilters() ? `<button class="mchip" data-mreset aria-label="Clear all filters">${ICON.close}<span>Clear ${nFilters()} filter${nFilters() === 1 ? '' : 's'}</span></button>` : ''}${M.by ? `<button class="mchip on" data-munsort aria-pressed="true">${ICON.sort}<span>Sorted by ${esc(MARKERS[M.by].name)}</span>${ICON.close}</button>` : ''}</div>${tableHTML(rows, cols)}${LEGEND}`;
+  const resultsHTML = (rows, cols) => `<div class="m-sum"><span>${rows.length} cell type${rows.length === 1 ? '' : 's'} · ${cols.length} marker${cols.length === 1 ? '' : 's'}${FC.content.allKeys.some(k => k[0] !== 'g' && !FC.content.isOn(k)) ? ` · ${esc(FC.content.levelName(FC.content.state.level))} content (Settings)` : ''}</span>${nFilters() ? `<button class="mchip" data-mreset aria-label="Clear all filters">${ICON.close}<span>Clear ${nFilters()} filter${nFilters() === 1 ? '' : 's'}</span></button>` : ''}${M.by ? `<button class="mchip on" data-munsort aria-pressed="true">${ICON.sort}<span>Sorted by ${esc(MARKERS[M.by].name)}</span>${ICON.close}</button>` : ''}</div>${tableHTML(rows, cols)}${LEGEND}`;
   // typing redraws the results only, so the search box (and the phone keyboard) stays put
   function refresh() { const r = dlg().querySelector('.m-results'); if (!r) return draw(); const { rows, cols } = view(); r.innerHTML = resultsHTML(rows, cols); }
   function draw(focusSearch) {
@@ -188,14 +180,14 @@
     let h;
     if (kind === 'cell') {
       const e = BY[key], lin = LINEAGES.find(l => l[0] === e.lineage)[1];
-      const items = ALL_MARKERS.filter(mk => GROUP_OF[mk] !== 'scatter' && carries(e, mk)).map(mk => ({ key: mk, name: MARKERS[mk].name, full: MARKERS[mk].full || '', tag: TAGS[reading(e, mk)[0]] }));
+      const items = ALL_MARKERS.filter(mk => GROUP_OF[mk] !== 'scatter' && FC.content.mkOn(mk) && carries(e, mk)).map(mk => ({ key: mk, name: MARKERS[mk].name, full: MARKERS[mk].full || '', tag: TAGS[reading(e, mk)[0]] }));
       h = `<h3>${e.kind === 'normal' ? '' : ICON.abn}${esc(e.name)}</h3><p class="md-sub">${e.long && e.long !== e.name ? esc(e.long) + ' · ' : ''}${e.kind === 'normal' ? 'Normal' : 'Abnormal'} · ${lin} · scatter: FSC ${e.fsc}, SSC ${e.ssc}</p>
         ${e.teach ? `<p class="md-teach">${esc(e.teach)}</p>` : ''}
         ${e.aliases ? `<p class="md-sub">Also called ${e.aliases.map(esc).join(', ')}</p>` : ''}
         <section class="qsec"><h4>Carries</h4><table class="qtab mark">${rowsHTML(items)}</table><p class="qfoot">Everything else is negative.</p></section>`;
     } else {
       const mk = key, m = MARKERS[mk];
-      const items = CELLS.filter(e => carries(e, mk)).map(e => ({ key: e.id, name: e.name, full: e.long && e.long !== e.name ? e.long : '', tag: TAGS[reading(e, mk)[0]], group: e.kind === 'normal' ? 'Normal' : 'Abnormal' }));
+      const items = CELLS.filter(e => FC.content.entOn(e.id) && carries(e, mk)).map(e => ({ key: e.id, name: e.name, full: e.long && e.long !== e.name ? e.long : '', tag: TAGS[reading(e, mk)[0]], group: e.kind === 'normal' ? 'Normal' : 'Abnormal' }));
       h = `<h3>${esc(m.name)}</h3>${fullOf(mk) ? `<p class="md-sub">${esc(fullOf(mk))}</p>` : ''}${m.note ? `<p class="md-teach">${esc(m.note)}</p>` : ''}
         <section class="qsec"><h4>Cells with ${esc(m.name)}</h4>${items.length ? `<table class="qtab cell">${rowsHTML(items)}</table>` : '<p class="help">None.</p>'}</section>
         <button class="btn" data-msortby="${esc(mk)}">${ICON.sort}<span>${M.by === mk ? 'Stop sorting by' : 'Sort cells by'} ${esc(m.name)}</span></button>`;

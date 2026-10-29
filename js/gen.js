@@ -98,17 +98,37 @@
 
   const ALL_MARKERS = markersOf(PLOTS);
   const excluded = (a, b) => (BY[a].excl || []).includes(b) || (BY[b].excl || []).includes(a);
-  function distance(eid, pop) { let d = 0; for (const mk of ALL_MARKERS) if (!fitsOne(eid, pop, mk)) d++; return d; }
+  function distance(eid, pop, mks = ALL_MARKERS) { let d = 0; for (const mk of mks) if (!fitsOne(eid, pop, mk)) d++; return d; }
 
-  function generate(seed, level = 'medium', custom) {
+  /* Content settings (js/content.js) pass `allow`: the cell types and markers that are on. A clone
+     that reads the same as a normal cell of its specimen on every marker that's on can't be told
+     apart, so it never comes up: lookalikes() names those normals and the markers that would separate them. */
+  const okMarkers = allow => allow ? new Set(['FSC', 'SSC', 'CD45', ...allow.mks]) : null;
+  const same = (a, b, mk) => { const x = allowed(BY[a], mk), y = allowed(BY[b], mk); return x.includes('split') || y.includes('split') || x.some(v => y.includes(v)); };
+  function lookalikes(clone, allow) {
+    const okE = new Set(allow.ents), okM = okMarkers(allow), mks = ALL_MARKERS.filter(mk => okM.has(mk));
+    const normals = new Set(SPECIMENS.filter(s => s.clones.includes(clone)).flatMap(s => s.normals).filter(id => okE.has(id) && !excluded(id, clone)));
+    const like = [...normals].filter(n => mks.every(mk => same(clone, n, mk)));
+    return { like, need: [...new Set(like.flatMap(n => ALL_MARKERS.filter(mk => !okM.has(mk) && !same(clone, n, mk))))] };
+  }
+
+  function generate(seed, level = 'medium', custom, allow) {
     const cfg = level === 'custom' ? customLevel(custom) : LEVELS[level];
     const r = mulberry32(seed >>> 0);
+    const okE = allow ? new Set(allow.ents) : null, okM = okMarkers(allow);
+    const entOk = id => !okE || okE.has(id), mkOk = mk => !okM || okM.has(mk);
+    const MKS = ALL_MARKERS.filter(mkOk), dist = (eid, pop) => distance(eid, pop, MKS);
     // Pick the clone first (every neoplasm equally likely) and keep it across retries, so the
-    // preference for cross-elimination boards doesn't skew which diagnoses come up.
-    const clone = pick(r, ENTITIES.filter(e => e.kind === 'neoplasm')).id;
+    // preference for cross-elimination boards doesn't skew which diagnoses come up. A clone that
+    // can't make a board with this content gives way to another.
+    const neos = ENTITIES.filter(e => e.kind === 'neoplasm' && entOk(e.id) && !(allow && lookalikes(e.id, allow).like.length));
+    if (!neos.length) throw new Error('no clone fits the content settings');
+    let clone = pick(r, neos).id;
+    const tried = [];
+    for (;;) {
     for (let attempt = 0; attempt < 400; attempt++) {
       const spec = pick(r, SPECIMENS.filter(s => s.clones.includes(clone)));
-      const normals = shuffle(r, spec.normals).filter(id => !excluded(id, clone)).slice(0, cfg.pops - 1);
+      const normals = shuffle(r, spec.normals).filter(id => !excluded(id, clone) && entOk(id)).slice(0, cfg.pops - 1);
       const ids = [...normals, clone];
       if (ids.length < cfg.pops) continue;
       const pops = ids.map(id => ({ id, lc: allowed(BY[id], 'LC')[0] }));
@@ -118,14 +138,14 @@
         for (const [mk, lvl] of Object.entries(BY[p.id].m)) if (lvl === 'var') p.res[mk] = r() < 0.5 ? 'pos' : 'neg';
       }
       const cp = pops.find(p => p.id === clone);
-      const near = (cands, to) => cands.map(e => ({ id: e.id, raw: Math.min(...to.map(p => distance(e.id, p))) })).filter(x => x.raw >= 1)
+      const near = (cands, to) => cands.map(e => ({ id: e.id, raw: Math.min(...to.map(p => dist(e.id, p))) })).filter(x => x.raw >= 1)
         .map(x => ({ id: x.id, d: x.raw + r() * 1.5 })).sort((a, b) => a.d - b.d);
 
       // Scratchpad choices. With a diagnosis step, the clone is "Abnormal (clone)" and the decoys are
       // normal cell types; without one, the scratchpad names the neoplasm itself (with look-alikes).
       let pool = [];
       if (cfg.scratch) {
-        const ok = e => !ids.includes(e.id) && ids.every(id => !excluded(id, e.id));
+        const ok = e => entOk(e.id) && !ids.includes(e.id) && ids.every(id => !excluded(id, e.id));
         if (cfg.dx) {
           const others = near(ENTITIES.filter(e => e.kind === 'normal' && ok(e)), pops);
           const decoys = cfg.decoys === 'all' ? others.map(x => x.id) : shuffle(r, others.slice(0, cfg.decoys * 2)).slice(0, cfg.decoys).map(x => x.id);
@@ -141,8 +161,8 @@
       // Diagnosis choices: the clone and 3 look-alikes (its lineage first), or every neoplasm.
       let dxPool = [];
       if (cfg.dx) {
-        const neo = ENTITIES.filter(e => e.kind === 'neoplasm' && e.id !== clone && !excluded(e.id, clone) && distance(e.id, cp) >= 1)
-          .map(e => ({ id: e.id, d: distance(e.id, cp) + r() * 1.5 + (e.lineage === BY[clone].lineage ? 0 : 4) })).sort((a, b) => a.d - b.d);
+        const neo = ENTITIES.filter(e => e.kind === 'neoplasm' && entOk(e.id) && e.id !== clone && !excluded(e.id, clone) && dist(e.id, cp) >= 1)
+          .map(e => ({ id: e.id, d: dist(e.id, cp) + r() * 1.5 + (e.lineage === BY[clone].lineage ? 0 : 4) })).sort((a, b) => a.d - b.d);
         dxPool = cfg.dx === 'choice' ? shuffle(r, [clone, ...shuffle(r, neo.slice(0, 5)).slice(0, 3).map(x => x.id)]) : [clone, ...neo.map(x => x.id)];
       }
       const unique = plots => {
@@ -152,7 +172,7 @@
         return true;
       };
 
-      const candidates = PLOTS.filter(p => !(p[0] === 'FSC' && p[1] === 'SSC'));
+      const candidates = PLOTS.filter(p => !(p[0] === 'FSC' && p[1] === 'SSC') && plotMarkers(p).every(mkOk));
       if (!unique(candidates)) continue;
 
       // Pin one plot of the clone's hallmarks: preferring one that tells it from a look-alike on offer.
@@ -220,6 +240,11 @@
       }
       puzzle.events = simulate(puzzle, mulberry32((seed ^ 0x9e3779b9) >>> 0));
       return puzzle;
+    }
+    tried.push(clone);
+    const left = neos.filter(e => !tried.includes(e.id));
+    if (!left.length) break;
+    clone = pick(r, left).id;
     }
     throw new Error('could not build a board for seed ' + seed);
   }
@@ -304,6 +329,6 @@
     return mk + { neg: '−', pos: '+', dim: ' dim', split: ' partly +' }[cls];
   }
 
-  const API = { generate, collisions, customLevel, countSolutions, fits, allowed, observed, markersOf, plotMarkers, why, describe, LEVELS, mulberry32 };
+  const API = { generate, lookalikes, collisions, customLevel, countSolutions, fits, allowed, observed, markersOf, plotMarkers, why, describe, LEVELS, mulberry32 };
   if (typeof module !== 'undefined') module.exports = API; else window.FC = Object.assign(window.FC || {}, API);
 })();

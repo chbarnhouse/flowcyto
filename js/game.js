@@ -142,7 +142,7 @@
     const sc = stats.custom;
     h += `<button class="card tile custom" data-custom><b>Custom</b><span class="tnote">Set every switch yourself: plots, gates, scratchpad, diagnosis.</span><span class="tstat">${sc ? `${sc.solved} solved` : ''}</span></button>`;
     const mb = load('flowcyto.markersBest', 0);
-    h += `<button class="card tile custom markers" data-markers><b>Markers</b><span class="tnote">Endless quiz: which cells carry which markers. Swipe or pick.</span><span class="tstat">${mb ? `best streak ${mb}` : ''}</span></button>`;
+    h += `<button class="card tile custom markers" data-markers><b>Quizzes</b><span class="tnote">Endless quizzes: which cells carry which markers, and which translocations and mutations go with which malignancies.</span><span class="tstat">${mb ? `best streak ${mb}` : ''}</span></button>`;
     h += '</div></main>';
     $('#menu').innerHTML = h;
     syncStatusBar();
@@ -193,10 +193,16 @@
   function startGame(level, seed, saved) {
     seed = seed || ((Math.random() * 1e9) >>> 0);
     const custom = level === 'custom' ? ((saved && saved.custom) || Object.assign({}, prefs.custom)) : null;
-    const P = generate(seed, level, custom);
+    // the content it starts with stays with the board (a board saved before Content existed used everything)
+    const allow = saved ? saved.allow || null : FC.content.allow();
+    let P;
+    try { P = generate(seed, level, custom, allow); } catch (e) {
+      history.replaceState(null, '', '#/'); showMenu();
+      return showTip($('#menu [data-settings]'), 'No board fits your content', 'Settings → Content: turn on more neoplasms, or the markers that tell them apart.', ICON.close);
+    }
     endTour(); closeRef(true);
     const refs0 = P.choose ? [] : [...P.pool.filter(id => id !== 'abn'), ...(P.cfg.dx === 'choice' ? P.dxPool : [])];
-    S = { level, seed, P, cfg: P.cfg, custom, marks: {}, checked: {}, wrongChecks: 0, hints: 0, peeks: new Set(), pad: {}, refRow: null,
+    S = { level, seed, P, cfg: P.cfg, custom, allow, marks: {}, checked: {}, wrongChecks: 0, hints: 0, peeks: new Set(), pad: {}, refRow: null,
       cols: P.choose ? [] : P.pool.slice(), refs: [...new Set(refs0)], typed: [], dxHint: 0,
       focus: null, crossed: [], phase: P.cfg.scratch ? 'play' : 'dx', pctPick: null, msg: null, flash: null, elapsed: 0, t0: null, undo: [], why: null };
     if (saved) Object.assign(S, { marks: saved.marks || {}, checked: saved.checked || {}, wrongChecks: saved.wrongChecks || 0, hints: saved.hints || 0, peeks: new Set(saved.peeks || []), master: !!saved.master, pad: saved.pad || {}, phase: saved.phase || S.phase, pctPick: saved.pctPick || null, msg: saved.msg || null, stats: saved.stats, elapsed: saved.elapsed || 0, cols: saved.cols || S.cols, refs: saved.refs || S.refs, typed: saved.typed || [], dxHint: saved.dxHint || 0, crossed: saved.crossed || [] });
@@ -246,7 +252,7 @@
   }
   function persist() {
     if (!S) return;
-    save('flowcyto.current', { level: S.level, seed: S.seed, custom: S.custom, marks: S.marks, checked: S.checked, wrongChecks: S.wrongChecks, hints: S.hints, peeks: [...S.peeks], master: !!S.master, pad: S.pad, cols: S.cols, refs: S.refs, typed: S.typed, dxHint: S.dxHint, phase: S.phase, pctPick: S.pctPick, msg: S.msg, stats: S.stats, gates: S.gates, sigSlot: S.sigSlot, cloneRow: S.cloneRow, crossed: S.crossed, elapsed: elapsedNow() });
+    save('flowcyto.current', { level: S.level, seed: S.seed, custom: S.custom, allow: S.allow, marks: S.marks, checked: S.checked, wrongChecks: S.wrongChecks, hints: S.hints, peeks: [...S.peeks], master: !!S.master, pad: S.pad, cols: S.cols, refs: S.refs, typed: S.typed, dxHint: S.dxHint, phase: S.phase, pctPick: S.pctPick, msg: S.msg, stats: S.stats, gates: S.gates, sigSlot: S.sigSlot, cloneRow: S.cloneRow, crossed: S.crossed, elapsed: elapsedNow() });
   }
 
   const shownPlots = () => S.P.plots.map(p => [p.x, p.y]);
@@ -1317,8 +1323,9 @@
   function openSettings() {
     const seg = (k, opts) => `<div class="seg" role="radiogroup">${opts.map(([v, t]) => `<button role="radio" data-pref="${k}" data-v="${v}" aria-checked="${String(prefs[k]) === String(v)}">${t}</button>`).join('')}</div>`;
     let h = `<div class="set-head"><h2 tabindex="-1" autofocus>Settings</h2><button class="iconbtn" data-close aria-label="Close settings">${ICON.close}</button></div>`;
-    // the mode's own settings first (the puzzles, or the Markers quiz), the app's at the bottom
+    // the mode's own settings first (the puzzles, or the Quizzes), then content and the app's
     const quiz = !$('#quiz').hidden, sec = t => `<h3 class="set-sec">${t}</h3>`;
+    setPage = 'main';
     if (!quiz) {
       if (!S) h += sec('Puzzles');
       h += `<div class="set-row"><div><b>Plot rows</b><span>Plots sit in a strip that scrolls sideways, in one row or two.</span></div>${seg('plotRows', [[1, 'One'], [2, 'Two']])}</div>`;
@@ -1336,15 +1343,19 @@
       h += `<div class="set-row"><div><b>How to play</b><span>A short walk-through on this board.</span></div><button class="btn" data-tour>Show me</button></div>`;
       if (!refFilled()) h += `<div class="set-row"><div><b>Reference</b><span>${left ? `Fill it in from the key. Counts as ${plural(left, 'peek')}.` : 'Already filled in.'}</span></div><button class="btn" data-fill ${left ? '' : 'disabled'}>Fill in from the key</button></div>`;
     } else {
-      h += sec('Markers quiz');
+      h += sec('Quizzes');
+      h += `<div class="set-row qset"><div><b>Topics</b><span>Any mix; at least one stays on.</span></div>${FC.markers.topicsHTML()}</div>`;
       h += `<div class="set-row qset"><div><b>Answer formats</b><span>Any mix; at least one stays on.</span></div>${FC.markers.kindsHTML()}</div>`;
       h += `<div class="set-row qset"><div><b>Directions</b><span>For every format but swipe. At least one stays on.</span></div>${FC.markers.dirsHTML()}</div>`;
-      h += `<div class="set-row"><div><b>Cell types</b><span>Which cells the questions ask about: normal, abnormal (neoplasms and clones), or both. The answers always list every cell, normal and abnormal under their own headings.</span></div>${FC.markers.cellsHTML()}</div>`;
+      h += `<div class="set-row"><div><b>Cell types</b><span>For the markers topic, which cells the questions ask about: normal, abnormal (neoplasms and clones), or both. The answers always list every cell, normal and abnormal under their own headings.</span></div>${FC.markers.cellsHTML()}</div>`;
       h += `<div class="set-row"><div><b>Full names</b><span>Abbreviations have a dotted underline. Press and hold one (slide to Keep it open to leave it up), or tap it. Holding a choice always shows its full name without picking it.</span></div>${seg('abbrOpen', [['hold', 'Press and hold'], ['tap', 'Tap']])}</div>`;
       const secs = [[0, 'Off'], [1, '1 s'], [2, '2 s'], [3, '3 s'], [5, '5 s']];
       h += `<div class="set-row"><div><b>Next question after a right answer</b><span>Off: wait for Next. A bar counts down; press and hold the answer (or scroll it) to pause.</span></div>${seg('quizRight', secs)}</div>`;
       h += `<div class="set-row"><div><b>Next question after a wrong answer</b><span>Off: wait for Next, so you can read the correction.</span></div>${seg('quizWrong', secs)}</div>`;
     }
+    h += sec('Content');
+    h += `<div class="set-row"><div><b>Level</b><span>Boards, quizzes and the master reference. Each level includes the ones before it.</span></div>${FC.content.levelSeg()}</div>`;
+    h += `<div class="set-row"><div><b>Cell types, markers and lesions</b><span>${esc(FC.content.summary())}</span></div><button class="btn" data-ctopen>Choose</button></div>`;
     h += sec('App');
     const a = prefs.appearance;
     h += `<div class="set-row"><div><b>Appearance</b><span>This device only.</span></div><div class="seg" role="radiogroup">${[['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark']].map(([v, t]) => `<button role="radio" data-theme-set="mode" data-v="${v}" aria-checked="${a.mode === v}">${t}</button>`).join('')}</div></div>`;
@@ -1354,8 +1365,18 @@
     dlg.innerHTML = h;
     if (!dlg.open) dlg.showModal();
   }
+  // Settings → Content: its own page in the same dialog
+  let setPage = 'main';
+  function openContent(keepScroll) {
+    const y = dlg.scrollTop;
+    setPage = 'content'; dlg.innerHTML = FC.content.pageHTML();
+    if (keepScroll) dlg.scrollTop = y; else { dlg.scrollTop = 0; dlg.querySelector('h2').focus({ preventScroll: true }); }
+  }
   dlg.addEventListener('click', ev => {
     if (ev.target === dlg || ev.target.closest('[data-close]')) return dlg.close();
+    if (ev.target.closest('[data-ctopen]')) return openContent();
+    if (ev.target.closest('[data-ctback]')) return openSettings();
+    if (FC.content.click(ev, () => setPage === 'content' ? openContent(true) : openSettings())) return;
     const t = ev.target.closest('[data-theme-set]');
     if (t) {
       const a = prefs.appearance, key = t.dataset.themeSet;

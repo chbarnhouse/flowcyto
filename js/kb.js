@@ -15,6 +15,8 @@
    point are left out on purpose, so a board never turns on trivia.
    `frac`: for a split marker, the share of the population that is positive (default half): Tregs are
    about a tenth of CD4 T cells.
+   `lvl`: the first level that expects it (1 Step 1 · 2 Step 2 CK · 3 Step 3 · 4 residency · 5 heme
+   fellowship; none = Step 1). The Content settings filter on it (js/content.js).
    `excl` lists entities that flow alone can't fairly separate from this one, so the generator
    never puts both in the same board. */
 (function () {
@@ -30,11 +32,11 @@
     CD117: { name: 'CD117', full: 'c-KIT, the stem cell factor receptor', note: 'myeloid blasts, mast cells' },
     TdT: { name: 'TdT', full: 'terminal deoxynucleotidyl transferase', note: 'immature lymphoid blasts (ALL)' },
     'HLA-DR': { name: 'HLA-DR', full: 'human leukocyte antigen DR (MHC class II)', note: 'B cells, monocytes, most blasts; absent in APL' },
-    CD13: { name: 'CD13', full: 'aminopeptidase N', note: 'myeloid' },
-    CD33: { name: 'CD33', full: 'Siglec-3', note: 'myeloid' },
+    CD13: { name: 'CD13', lvl: 2, full: 'aminopeptidase N', note: 'myeloid' },
+    CD33: { name: 'CD33', lvl: 2, full: 'Siglec-3', note: 'myeloid' },
     MPO: { name: 'MPO', full: 'myeloperoxidase', note: 'myeloid lineage (cytoplasmic)' },
     CD14: { name: 'CD14', full: 'lipopolysaccharide (LPS) co-receptor', note: 'monocytes' },
-    CD64: { name: 'CD64', full: 'Fc gamma receptor I (FcγRI)', note: 'monocytes' },
+    CD64: { name: 'CD64', lvl: 4, full: 'Fc gamma receptor I (FcγRI)', note: 'monocytes' },
     CD11b: { name: 'CD11b', full: 'integrin alpha-M (Mac-1)', note: 'maturing myeloid cells' },
     CD15: { name: 'CD15', full: 'Lewis X (SSEA-1)', note: 'granulocytes' },
     CD16: { name: 'CD16', full: 'Fc gamma receptor III (FcγRIII)', note: 'neutrophils, NK cells' },
@@ -42,18 +44,18 @@
     CD3: { name: 'CD3', note: 'T cells (cytoplasmic in T-ALL)' },
     CD4: { name: 'CD4', note: 'helper T cells; dim on monocytes' },
     CD8: { name: 'CD8', note: 'cytotoxic T cells' },
-    CD7: { name: 'CD7', note: 'pan-T; lost in Sézary and ATLL' },
-    CD2: { name: 'CD2', full: 'LFA-2', note: 'pan-T, NK' },
+    CD7: { name: 'CD7', lvl: 4, note: 'pan-T; lost in Sézary and ATLL' },
+    CD2: { name: 'CD2', lvl: 4, full: 'LFA-2', note: 'pan-T, NK' },
     CD5: { name: 'CD5', note: 'T cells; aberrant on CLL and mantle cell' },
     CD1a: { name: 'CD1a', note: 'cortical thymocytes (T-ALL), Langerhans cells' },
-    CD26: { name: 'CD26', full: 'dipeptidyl peptidase-4 (DPP-4)', note: 'lost on Sézary cells' },
+    CD26: { name: 'CD26', lvl: 5, full: 'dipeptidyl peptidase-4 (DPP-4)', note: 'lost on Sézary cells' },
     CD19: { name: 'CD19', note: 'B cells from the earliest precursor' },
     CD20: { name: 'CD20', note: 'mature B cells; dim in CLL; target of rituximab' },
-    CD22: { name: 'CD22', full: 'Siglec-2', note: 'B cells' },
+    CD22: { name: 'CD22', lvl: 4, full: 'Siglec-2', note: 'B cells' },
     CD10: { name: 'CD10', full: 'common acute lymphoblastic leukemia antigen (CALLA)', note: 'germinal center (FL, Burkitt), B-ALL, mature neutrophils' },
     CD23: { name: 'CD23', full: 'low-affinity IgE receptor (FcεRII)', note: 'CLL positive, mantle cell negative' },
-    CD200: { name: 'CD200', full: 'OX-2', note: 'CLL bright, mantle cell negative' },
-    FMC7: { name: 'FMC7', full: 'an epitope on CD20, named for its antibody clone', note: 'CLL negative, mantle cell positive' },
+    CD200: { name: 'CD200', lvl: 5, full: 'OX-2', note: 'CLL bright, mantle cell negative' },
+    FMC7: { name: 'FMC7', lvl: 5, full: 'an epitope on CD20, named for its antibody clone', note: 'CLL negative, mantle cell positive' },
     CD11c: { name: 'CD11c', full: 'integrin alpha-X', note: 'hairy cell (with CD25, CD103); monocytes' },
     CD25: { name: 'CD25', full: 'interleukin-2 receptor alpha chain (IL-2Rα)', note: 'hairy cell, ATLL; normally a small subset of CD4 T cells (Tregs, activated cells)' },
     CD103: { name: 'CD103', full: 'integrin alpha-E', note: 'hairy cell' },
@@ -65,6 +67,18 @@
     CD59: { name: 'CD59', full: 'membrane inhibitor of reactive lysis (MIRL), protectin', note: 'GPI-anchored; lost in PNH' },
     LC: { name: 'κ / λ', full: 'kappa and lambda immunoglobulin light chains', note: 'surface light chains: polyclonal (both) or restricted (one = clonal)' },
   };
+
+  /* Marker groups: the master reference's columns and the Content settings' lists. */
+  const MGROUPS = [
+    ['scatter', 'Scatter', ['FSC', 'SSC']],
+    ['blast', 'General and blasts', ['CD45', 'CD34', 'CD117', 'TdT', 'HLA-DR']],
+    ['myeloid', 'Myeloid and monocyte', ['CD13', 'CD33', 'MPO', 'CD14', 'CD64', 'CD11b', 'CD15', 'CD16']],
+    ['t', 'T and NK', ['CD3', 'CD4', 'CD8', 'CD7', 'CD2', 'CD5', 'CD1a', 'CD26', 'CD56']],
+    ['b', 'B and hairy cell', ['CD19', 'CD20', 'CD22', 'CD10', 'CD23', 'CD200', 'FMC7', 'CD11c', 'CD25', 'CD103', 'LC']],
+    ['plasma', 'Plasma cell', ['CD38', 'CD138']],
+    ['mega', 'Megakaryocyte', ['CD41', 'CD61']],
+    ['pnh', 'GPI-anchored (PNH)', ['CD55', 'CD59']],
+  ];
 
   /* Curated plots: the pairs a real panel would draw. [x, y]. */
   const PLOTS = [
@@ -91,7 +105,7 @@
     { id: 'bmat', kind: 'normal', lineage: 'B', name: 'Mature B cell', long: 'Mature B cell (polyclonal)', ...LYM,
       m: { CD45: 'bright', CD19: '+', CD20: '+', CD22: '+', CD23: 'split', CD200: '+', FMC7: 'split', 'HLA-DR': '+', LC: 'poly', CD55: '+', CD59: '+' },
       teach: 'CD19+ CD20+ with both kappa and lambda: normal polyclonal B cells.' },
-    { id: 'hgone', kind: 'normal', lineage: 'B', name: 'Hematogone', long: 'Hematogone (normal B precursor)', ...LYM, cont: { late: ['CD20'] },
+    { id: 'hgone', lvl: 4, kind: 'normal', lineage: 'B', name: 'Hematogone', long: 'Hematogone (normal B precursor)', ...LYM, cont: { late: ['CD20'] },
       m: { CD45: 'dim', CD19: '+', CD10: '+', CD22: 'dim', CD34: 'split', TdT: 'split', CD20: 'split', 'HLA-DR': '+', CD55: '+', CD59: '+' },
       teach: 'Normal B precursors mature as a continuum: TdT and CD34 fade while CD20 appears. A blast clone instead sits as one tight cluster.' },
     { id: 'plasma', kind: 'normal', lineage: 'plasma', name: 'Plasma cell', long: 'Normal plasma cell (polyclonal)', fsc: 'mid', ssc: 'low',
@@ -135,7 +149,7 @@
     { id: 'apl', kind: 'neoplasm', aliases: ['APL', 'M3', 'AML M3', 'AML-M3', 'acute promyelocytic leukemia', 'promyelocytic leukemia'], key: ['HLA-DR', 'CD34', 'CD117'], lineage: 'myeloid', name: 'APL (AML-M3)', long: 'Acute promyelocytic leukemia', fsc: 'mid', ssc: 'high',
       m: { CD45: 'dim', CD117: '+', CD13: '+', CD33: 'bright', MPO: 'bright', CD55: '+', CD59: '+' },
       teach: 'APL: high SSC with CD34− HLA-DR− and bright CD33/MPO. t(15;17) PML-RARA; DIC; all-trans retinoic acid.' },
-    { id: 'amol', kind: 'neoplasm', aliases: ['M5', 'AML M5', 'AML-M5', 'acute monocytic leukemia', 'monocytic leukemia', 'acute monoblastic leukemia'], key: ['CD14', 'CD64'], lineage: 'myeloid', name: 'Acute monocytic leukemia', long: 'Acute monocytic leukemia (AML-M5)', fsc: 'mid', ssc: 'mid', excl: ['mono'],
+    { id: 'amol', lvl: 2, kind: 'neoplasm', aliases: ['M5', 'AML M5', 'AML-M5', 'acute monocytic leukemia', 'monocytic leukemia', 'acute monoblastic leukemia'], key: ['CD14', 'CD64'], lineage: 'myeloid', name: 'Acute monocytic leukemia', long: 'Acute monocytic leukemia (AML-M5)', fsc: 'mid', ssc: 'mid', excl: ['mono'],
       m: { CD45: '+', CD64: '+', CD33: 'bright', CD13: 'dim', CD11b: '+', CD11c: '+', CD14: 'var', CD56: 'var', 'HLA-DR': '+', CD4: 'dim', CD55: '+', CD59: '+' },
       teach: 'Acute monocytic (M5): CD64+ CD11b+ CD33 bright, CD34−, CD14 partial. Gum and skin infiltration.' },
     { id: 'amkl', kind: 'neoplasm', aliases: ['M7', 'AML M7', 'AML-M7', 'AMKL', 'acute megakaryoblastic leukemia', 'megakaryoblastic leukemia'], key: ['CD41', 'CD61'], lineage: 'myeloid', name: 'Megakaryoblastic AML', long: 'Acute megakaryoblastic leukemia (AML-M7)', fsc: 'mid', ssc: 'low',
@@ -177,6 +191,6 @@
     return 'pos';
   }
 
-  const FC = { MARKERS, PLOTS, ENTITIES: E, BY, SPECIMENS, readClass };
+  const FC = { MARKERS, MGROUPS, PLOTS, ENTITIES: E, BY, SPECIMENS, readClass };
   if (typeof module !== 'undefined') module.exports = FC; else window.FC = Object.assign(window.FC || {}, FC);
 })();
