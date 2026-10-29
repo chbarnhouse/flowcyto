@@ -7,7 +7,12 @@
    (flowcyto.content). Shown as the Content tab of Settings.
    Those are the defaults. The Quizzes and Custom boards can each keep their own content instead (their
    Advanced section), one-off: the Quizzes' goes when you leave them, Custom's when the sheet opens
-   afresh. A scope whose override is null reads the defaults. `use(scope)` says whose content
+   afresh. A scope whose override is null reads the defaults. Advanced always shows the controls; the
+   first change copies the defaults into an override, and anything that differs from them is marked
+   with a dot and can be reverted (singly, by group, or all at once; back to no differences = null).
+   An item differs when it reads otherwise than your defaults' own switch for it would at this scope's
+   level, so changing the level alone marks the level, not every item it turns on.
+   `use(scope)` says whose content
    the app is reading right now (the Quizzes' while a quiz is open); a board snapshots its own at the start. */
 (function () {
   'use strict';
@@ -57,7 +62,14 @@
   const allKeys = SECTIONS.flatMap(s => s.groups.flatMap(g => g[2]));
 
   function set(C, key, on) { if (on === (lvlOf(key) <= C.level)) delete C.on[key]; else C.on[key] = on; }
-  function changed(sc) { SCOPES[sc].save(); if (FC.onContent) FC.onContent(); }
+  function changed(sc) { tidy(sc); SCOPES[sc].save(); if (FC.onContent) FC.onContent(); }
+  // an override: what each item would be with your defaults' switches at its level; what differs
+  const expected = (C, key) => key in DEF.on ? DEF.on[key] : lvlOf(key) <= C.level;
+  const differs = (C, key) => onIn(C, key) !== expected(C, key);
+  const nDiffs = C => (C.level !== DEF.level) + allKeys.filter(k => differs(C, k)).length;
+  function setOwn(C, key, on) { if (on !== expected(C, key)) C.on[key] = on; else if (key in DEF.on) C.on[key] = DEF.on[key]; else delete C.on[key]; }
+  function tidy(sc) { const C = sc !== 'def' && SCOPES[sc].get(); if (C && !nDiffs(C)) SCOPES[sc].set(null); }
+  const DOT = '<i class="chg" role="img" aria-label="changed from your default" title="Changed from your default"></i>';
 
   // ---------- the page ----------
   const ICON = {
@@ -85,20 +97,20 @@
     }
     return out.length ? `<p class="ct-note">Not on boards (quizzes still ask about them): ${out.join('. ')}.</p>` : '';
   }
-  function itemHTML(C, key) {
-    const on = onIn(C, key), lv = lvlOf(key), d = key[0] === 'e' ? dis(key.slice(2)) : null;
+  function itemHTML(C, key, own) {
+    const on = onIn(C, key), chg = own && differs(C, key), lv = lvlOf(key), d = key[0] === 'e' ? dis(key.slice(2)) : null;
     const tags = [lv > 1 ? levelName(lv) : '', d && d.kind === 'genetic' ? 'quiz only' : ''].filter(Boolean);
-    return `<button class="mchip ct" data-ct="${esc(key)}" aria-pressed="${on}">${on ? ICON.check : '<span class="ic"></span>'}<span>${esc(nameOf(key))}</span>${tags.map(t => `<small class="ct-tag">${t}</small>`).join('')}</button>`;
+    return `<button class="mchip ct" data-ct="${esc(key)}" aria-pressed="${on}">${on ? ICON.check : '<span class="ic"></span>'}<span>${esc(nameOf(key))}</span>${tags.map(t => `<small class="ct-tag">${t}</small>`).join('')}${chg ? DOT : ''}</button>`;
   }
   /* The lists for one scope: level, anything set by hand, `extra` (the Quizzes' cell types), then the
      sections. Custom boards have no lesions, and quizzes no boards, so each sees only its own. */
   const LEVEL_FOR = { def: 'For boards, quizzes and the master reference.', quiz: 'For the Quizzes.', custom: 'For Custom boards.' };
   function bodyHTML(extra = '', sc = 'def') {
-    const C = scopeState(sc);
-    let h = `<div class="set-row ct-level"><div><b>Level</b><span>${LEVEL_FOR[sc]} ${levelWords(C)} Anything beyond Step 1 is tagged with its level.${sc === 'quiz' ? '' : " A board you're in the middle of keeps what it started with."}</span></div>${levelTrack(C)}</div>`;
+    const C = scopeState(sc), own = sc !== 'def', lvChg = own && C.level !== DEF.level;
+    let h = `<div class="set-row ct-level"><div><b>Level${lvChg ? DOT : ''}</b>${lvChg ? `<button class="btn mini ct-rev" data-ctrevert="level">Revert to ${levelName(DEF.level)}</button>` : ''}<span>${LEVEL_FOR[sc]} ${levelWords(C)} Anything beyond Step 1 is tagged with its level.${sc === 'quiz' ? '' : " A board you're in the middle of keeps what it started with."}</span></div>${levelTrack(C)}</div>`;
     const hand = Object.keys(C.on).length;
     h += extra;
-    if (hand) h += `<div class="set-row"><div><b>${hand} change${hand === 1 ? '' : 's'} by hand</b><span>Items turned on or off by hand, whatever the level says.</span></div><button class="btn" data-ctreset>Match the level</button></div>`;
+    if (hand && !own) h += `<div class="set-row"><div><b>${hand} change${hand === 1 ? '' : 's'} by hand</b><span>Items turned on or off by hand, whatever the level says.</span></div><button class="btn" data-ctreset>Match the level</button></div>`;
     for (const s of SECTIONS) {
       if (sc === 'custom' && s.id === 'g') continue;
       const ks = s.groups.flatMap(g => g[2]).filter(x => !(sc === 'custom' && x[0] === 'e' && dis(x.slice(2)).kind === 'genetic')), n = ks.filter(k => onIn(C, k)).length;
@@ -109,8 +121,8 @@
       for (const [g, t, all] of s.groups) {
         // Custom boards can't use the diseases that have no board of their own
         const keys = sc === 'custom' ? all.filter(x => !(x[0] === 'e' && dis(x.slice(2)).kind === 'genetic')) : all;
-        const k = keys.filter(x => onIn(C, x)).length, gid = `${s.id}.${g}`;
-        h += `<div class="ct-grp"><div class="ct-gh"><b>${t}</b><span>${k} of ${keys.length}</span><button class="btn mini" data-ctall="${gid}" ${k === keys.length ? 'disabled' : ''}>All</button><button class="btn mini" data-ctnone="${gid}" ${k ? '' : 'disabled'}>None</button></div><div class="mchips">${keys.map(x => itemHTML(C, x)).join('')}</div></div>`;
+        const k = keys.filter(x => onIn(C, x)).length, gid = `${s.id}.${g}`, gChg = own && keys.some(x => differs(C, x));
+        h += `<div class="ct-grp"><div class="ct-gh"><b>${t}${gChg ? DOT : ''}</b><span>${k} of ${keys.length}</span>${gChg ? `<button class="btn mini ct-rev" data-ctrevert="${gid}">Revert</button>` : ''}<button class="btn mini" data-ctall="${gid}" ${k === keys.length ? 'disabled' : ''}>All</button><button class="btn mini" data-ctnone="${gid}" ${k ? '' : 'disabled'}>None</button></div><div class="mchips">${keys.map(x => itemHTML(C, x, own)).join('')}</div></div>`;
       }
     }
     return sc === 'def' ? h : `<div data-ctscope="${sc}">${h}</div>`;
@@ -120,29 +132,41 @@
   const advOpen = {};
   document.addEventListener('toggle', ev => { const d = ev.target; if (d.matches && d.matches('details.ct-adv')) advOpen[d.dataset.ctscope] = d.open; }, true);
   function advancedHTML(sc, what) {
-    const own = SCOPES[sc].get();
-    const state = own ? `Own content: ${esc(summary(own, sc === 'quiz'))}` : `Your defaults (Settings → Content): ${esc(summary(DEF, sc === 'quiz'))}`;
-    let h = `<details class="ct-adv" data-ctscope="${sc}" ${advOpen[sc] ? 'open' : ''}><summary><span class="ct-adv-t"><b>Advanced</b><span>${state}</span></span></summary><div class="ct-adv-in">`;
-    const howLong = sc === 'quiz' ? 'For this visit to Quizzes only: leaving them puts your defaults back.' : 'For boards started from this sheet: opening Custom again starts from your defaults.';
-    h += own ? `<div class="set-row"><div><b>Content for ${what}</b><span>${howLong}</span></div><button class="btn" data-ctdefaults>Use my defaults</button></div>${bodyHTML('', sc)}`
-      : `<div class="set-row"><div><b>Content for ${what}</b><span>${what[0].toUpperCase() + what.slice(1)} use your defaults. Give them their own level and cell types, markers${sc === 'quiz' ? ' and lesions' : ''} this once; your defaults stay as they are.</span></div><button class="btn" data-ctown>Set their own</button></div>`;
-    return h + '</div></details>';
+    const own = SCOPES[sc].get(), n = own ? nDiffs(own) : 0;
+    const state = n ? `${n} change${n === 1 ? '' : 's'} from your defaults, for ${sc === 'quiz' ? 'this quiz' : 'these boards'} only` : 'Your defaults (Settings → Content)';
+    let h = `<details class="ct-adv" data-ctscope="${sc}" ${advOpen[sc] ? 'open' : ''}><summary><span class="ct-adv-t"><b>Advanced${n ? DOT : ''}</b><span>${state}</span></span></summary><div class="ct-adv-in">`;
+    const howLong = sc === 'quiz' ? 'leaving Quizzes puts your defaults back' : 'opening Custom again starts from your defaults';
+    h += `<div class="set-row"><div><b>Content for ${what}</b><span>Starts from your defaults in Settings → Content. Anything you change here is for ${sc === 'quiz' ? 'this quiz' : 'boards started from this sheet'} only and is marked with a dot; ${howLong}.</span></div>${n ? '<button class="btn" data-ctrevert="all">Revert all to default</button>' : ''}</div>`;
+    return h + bodyHTML('', sc) + '</div></details>';
   }
+
   const keysOf = sel => { const [s, g] = sel.split('.'); const sec = SECTIONS.find(x => x.id === s); return g ? sec.groups.find(x => x[0] === g)[2] : sec.groups.flatMap(x => x[2]); };
 
   // clicks on any content control; the scope is the nearest data-ctscope (else the defaults). `redraw`
   // puts the page back
   function click(ev, redraw) {
-    const t = ev.target, box = t.closest('[data-ctscope]'), sc = box ? box.dataset.ctscope : 'def', C = scopeState(sc);
-    if (t.closest('[data-ctown]')) { SCOPES[sc].set(JSON.parse(JSON.stringify(DEF))); advOpen[sc] = true; changed(sc); return redraw(), true; }
-    if (t.closest('[data-ctdefaults]')) { SCOPES[sc].set(null); changed(sc); return redraw(), true; }
-    const lv = t.closest('[data-ctlevel]'); if (lv) { C.level = +lv.dataset.ctlevel; for (const k of Object.keys(C.on)) set(C, k, C.on[k]); changed(sc); return redraw(), true; }
-    const it = t.closest('[data-ct]'); if (it) { const k = it.dataset.ct; set(C, k, !onIn(C, k)); changed(sc); return redraw(), true; }
+    const t = ev.target, box = t.closest('[data-ctscope]'), sc = box ? box.dataset.ctscope : 'def', own = sc !== 'def';
+    // an override comes into being with its first change: a copy of the defaults
+    const C = () => own ? SCOPES[sc].get() || (SCOPES[sc].set(JSON.parse(JSON.stringify(DEF))), SCOPES[sc].get()) : DEF;
+    const put = (c, k, on) => own ? setOwn(c, k, on) : set(c, k, on);
+    const done = () => (changed(sc), redraw(), true);
+    const rv = t.closest('[data-ctrevert]');
+    if (rv) {
+      const what = rv.dataset.ctrevert, c = SCOPES[sc].get(); if (!c) return true;
+      if (what === 'all') SCOPES[sc].set(null);
+      else if (what === 'level') c.level = DEF.level;
+      else for (const k of keysOf(what)) put(c, k, expected(c, k));
+      return done();
+    }
+    const lv = t.closest('[data-ctlevel]');
+    if (lv) { const c = C(); c.level = +lv.dataset.ctlevel; if (!own) for (const k of Object.keys(c.on)) set(c, k, c.on[k]); return done(); }
+    const it = t.closest('[data-ct]'); if (it) { const c = C(), k = it.dataset.ct; put(c, k, !onIn(c, k)); return done(); }
     const all = t.closest('[data-ctall]'), none = t.closest('[data-ctnone]');
-    if (all || none) { for (const k of keysOf((all || none).dataset[all ? 'ctall' : 'ctnone'])) set(C, k, !!all); changed(sc); return redraw(), true; }
-    if (t.closest('[data-ctreset]')) { C.on = {}; changed(sc); return redraw(), true; }
+    if (all || none) { const c = C(); for (const k of keysOf((all || none).dataset[all ? 'ctall' : 'ctnone'])) put(c, k, !!all); return done(); }
+    if (t.closest('[data-ctreset]')) { DEF.on = {}; return done(); }
     return false;
   }
+
   const scope = (name, get, setTo, saveIt) => { SCOPES[name] = { get, set: setTo, save: saveIt }; };
   const use = sc => { active = sc || 'def'; };
   const usingOwn = () => active !== 'def' && !!SCOPES[active].get();
