@@ -1354,7 +1354,7 @@
       h += `<div class="set-row"><div><b>Next question after a right answer</b><span>Off: wait for Next. A bar counts down; press and hold the answer (or scroll it) to pause.</span></div>${seg('quizRight', secs)}</div>`;
       h += `<div class="set-row"><div><b>Next question after a wrong answer</b><span>Off: wait for Next, so you can read the correction.</span></div>${seg('quizWrong', secs)}</div>`;
     } else if (setTab === 'content') {
-      h += FC.content.bodyHTML(`<div class="set-row"><div><b>Marker questions ask about</b><span>In the Quizzes' markers topic: normal cells, abnormal ones (neoplasms and clones), or both. The answers always list every cell that's on.</span></div>${FC.markers.cellsHTML()}</div>`);
+      h += FC.content.bodyHTML(`<div class="set-row"><div><b>Quizzes ask about</b><span>${esc(FC.markers.cellsNote())} The answers always list every cell that's on.</span></div>${FC.markers.cellsHTML()}</div>`);
     } else {
     const a = prefs.appearance;
     h += `<div class="set-row"><div><b>Appearance</b><span>This device only.</span></div><div class="seg" role="radiogroup">${[['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark']].map(([v, t]) => `<button role="radio" data-theme-set="mode" data-v="${v}" aria-checked="${a.mode === v}">${t}</button>`).join('')}</div></div>`;

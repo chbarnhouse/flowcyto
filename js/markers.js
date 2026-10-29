@@ -55,7 +55,12 @@
   const named = (id, mk) => new RegExp(`(^|[^A-Za-z0-9])${mk}([^A-Za-z0-9]|$)`).test(BY[id].name);
   const pick = a => a[Math.floor(Math.random() * a.length)];
   const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-  const cellPool = () => ENTITIES.filter(e => CT.entOn(e.id) && (Q.cfg.cells === 'both' || e.kind === Q.cfg.cells)).map(e => e.id);
+  /* Which cells the quiz asks about. Translocations and mutations belong to malignancies only, so with
+     that topic on, Normal isn't a choice (and on its own, neither is Both): the saved choice stays put
+     for when it's off again, and this is what applies meanwhile. */
+  const cellChoices = () => !Q.cfg.topics.genetics ? ['normal', 'neoplasm', 'both'] : Q.cfg.topics.markers ? ['neoplasm', 'both'] : ['neoplasm'];
+  const cells = () => cellChoices().includes(Q.cfg.cells) ? Q.cfg.cells : Q.cfg.cells === 'normal' && Q.cfg.topics.markers ? 'both' : 'neoplasm';
+  const cellPool = () => ENTITIES.filter(e => CT.entOn(e.id) && (cells() === 'both' || e.kind === cells())).map(e => e.id);
 
   // genetics: a link that's on is a yes; a classic lesion of another disease is a no; anything else isn't asked
   const LINK = new Map(G.LINKS.map(l => [l[0] + '|' + l[1], l]));
@@ -233,8 +238,10 @@
   const topicsHTML = () => `<div class="qchips">${Object.entries(TOPIC_NAMES).map(([k, t]) => chipOf(`data-qtopic="${k}"`, !!Q.cfg.topics[k], t)).join('')}</div>`;
   const dirsHTML = () => `<div class="qchips">${Object.entries(DIRS).map(([k, t]) => chipOf(`data-qdir="${k}"`, !!Q.cfg.dirs[k], t)).join('')}</div>`;
   // which cells the questions (and the answer lists) draw on
-  const cellsHTML = () => `<div class="seg" role="radiogroup">${[['normal', 'Normal'], ['neoplasm', 'Abnormal'], ['both', 'Both']].map(([v, t]) => `<button role="radio" data-qcells="${v}" aria-checked="${Q.cfg.cells === v}">${t}</button>`).join('')}</div>`;
-  const modeHTML = () => `<div class="qrow col"><div><b>Topics</b></div>${topicsHTML()}</div><div class="qrow col"><div><b>Answer formats</b></div>${kindsHTML()}</div><div class="qrow"><div><b>Directions</b><span>For every format but swipe: name the cells for a marker or lesion, the markers or lesions for a cell, or both.</span></div>${dirsHTML()}</div><div class="qrow"><div><b>Cell types</b><span>For the markers topic: normal cells, abnormal ones (neoplasms and clones), or both.</span></div>${cellsHTML()}</div>`;
+  const cellsHTML = () => `<div class="seg" role="radiogroup">${[['normal', 'Normal'], ['neoplasm', 'Abnormal'], ['both', 'Both']].map(([v, t]) => `<button role="radio" data-qcells="${v}" aria-checked="${cells() === v}" ${cellChoices().includes(v) ? '' : 'disabled'}>${t}</button>`).join('')}</div>`;
+  // what the Cell types row says
+  const cellsNote = () => 'Normal cells, abnormal ones (neoplasms and clones), or both.' + (Q.cfg.topics.genetics ? ` Translocations and mutations are only about abnormal cells${Q.cfg.topics.markers ? ', so Normal needs that topic off' : ''}.` : '');
+  const modeHTML = () => `<div class="qrow col"><div><b>Topics</b></div>${topicsHTML()}</div><div class="qrow col"><div><b>Answer formats</b></div>${kindsHTML()}</div><div class="qrow"><div><b>Directions</b><span>For every format but swipe: name the cells for a marker or lesion, the markers or lesions for a cell, or both.</span></div>${dirsHTML()}</div><div class="qrow"><div><b>Cell types</b><span>${cellsNote()}</span></div>${cellsHTML()}</div>`;
   function setup() {
     Q.q = null;
     $('#quiz').innerHTML = bar() + `<main class="qmain"><section class="qcard setup card"><h2>Quizzes</h2><p class="sub">Endless quizzes on which cells carry which markers, and which translocations and mutations go with which malignancies. Pick any mix of topics and answer formats; change them any time in Settings. Settings → Content sets the level.</p>
@@ -445,7 +452,7 @@
       if (tp) { if (!flip(Q.cfg.topics, tp.dataset.qtopic)) return; }
       else if (f) { if (!flip(Q.cfg.formats, f.dataset.qfmt)) return; }
       else if (d) { if (!flip(Q.cfg.dirs, d.dataset.qdir)) return; }
-      else Q.cfg.cells = c.dataset.qcells;
+      else if (!c.disabled) Q.cfg.cells = c.dataset.qcells; else return;
       save('flowcyto.markers', Q.cfg);
       if (!$('#quiz').hidden && !Q.q) setup();
       if (inSettings) FC.openSettings();
@@ -486,5 +493,5 @@
     else if (Q.done && (ev.key === 'Enter' || ev.key === ' ') && !ev.target.closest('input, button')) { ev.preventDefault(); next(); }
   });
 
-  FC.markers = { open, close, modeHTML, topicsHTML, kindsHTML, dirsHTML, cellsHTML, makeQuestion: () => makeQuestion(), cfg: Q.cfg };
+  FC.markers = { open, close, modeHTML, topicsHTML, kindsHTML, dirsHTML, cellsHTML, cellsNote, makeQuestion: () => makeQuestion(), cfg: Q.cfg };
 })();
