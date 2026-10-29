@@ -58,6 +58,8 @@
   // the tool picked used to be remembered across boards; now each board starts with Settings' Starting tool
   if ('padTool' in prefs) { if (prefs.padTool && prefs.padTool !== 'erase' && !prefs.startTool) prefs.startTool = prefs.padTool; delete prefs.padTool; }
   const setPref = (k, v) => { prefs[k] = v; save('flowcyto.prefs', prefs); };
+  // Custom boards' own content (null: Settings → Content)
+  FC.content.scope('custom', () => prefs.custom.content || null, v => { prefs.custom.content = v; }, () => setPref('custom', prefs.custom));
   /* Level changes keep their stats: 3→4 levels (old Hard became Extreme), 4→6 (old Medium is closest
      to the new Hard, old gated Hard to Expert), then the two modes merged into one game: each level's
      counts are added together. The old daily-board record and any board in progress are dropped (the
@@ -186,9 +188,11 @@
     h += `<div class="set-row"><div><b>Populations look</b></div>${seg('spread', [['distinct', 'Distinct'], ['normal', 'Normal'], ['touching', 'Touching']])}</div>`;
     h += `<div class="set-row"><div><b>Share-of-events question</b></div>${seg('pct', [[false, 'Off'], [true, 'On']])}</div>`;
     if (c.scratch === false && c.dx === 'off') h += '<p class="help">With both steps off there is nothing to solve, so the diagnosis comes back on as Pick from 4.</p>';
+    h += FC.content.advancedHTML('custom', 'Custom boards');
     h += `<div class="actions end"><button class="btn primary" data-cplay>Play</button></div>`;
+    const y = csheet.scrollTop;
     csheet.innerHTML = h; csheet.dataset.kind = 'custom';
-    if (!csheet.open) csheet.showModal();
+    if (!csheet.open) csheet.showModal(); else csheet.scrollTop = y;
   }
 
   // ---------- game ----------
@@ -196,7 +200,7 @@
     seed = seed || ((Math.random() * 1e9) >>> 0);
     const custom = level === 'custom' ? ((saved && saved.custom) || Object.assign({}, prefs.custom)) : null;
     // the content it starts with stays with the board (a board saved before Content existed used everything)
-    const allow = saved ? saved.allow || null : FC.content.allow();
+    const allow = saved ? saved.allow || null : FC.content.allow(level === 'custom' ? 'custom' : 'def');
     let P;
     try { P = generate(seed, level, custom, allow); } catch (e) {
       history.replaceState(null, '', '#/'); showMenu();
@@ -1091,6 +1095,7 @@
   function afterEdit() { S.msg = null; drawPanel(); if (refIsOpen()) drawRef(); }
   csheet.addEventListener('click', ev => {
     if (ev.target === csheet || ev.target.closest('[data-close]')) return csheet.close();
+    if (csheet.dataset.kind === 'custom' && FC.content.click(ev, openCustom)) return;
     const cs = ev.target.closest('[data-cset]');
     if (cs) {
       const c = prefs.custom, k = cs.dataset.cset, v = cs.dataset.v;
@@ -1356,7 +1361,9 @@
       const secs = [[0, 'Off'], [1, '1 s'], [2, '2 s'], [3, '3 s'], [5, '5 s']];
       h += `<div class="set-row"><div><b>Next question after a right answer</b><span>Off: wait for Next. A bar counts down; press and hold the answer (or scroll it) to pause.</span></div>${seg('quizRight', secs)}</div>`;
       h += `<div class="set-row"><div><b>Next question after a wrong answer</b><span>Off: wait for Next, so you can read the correction.</span></div>${seg('quizWrong', secs)}</div>`;
+      h += FC.content.advancedHTML('quiz', 'quizzes');
     } else if (setTab === 'content') {
+      if (FC.content.usingOwn()) h += '<p class="ct-note">This quiz uses its own content (Quizzes → Advanced). What you set here are your defaults.</p>';
       h += FC.content.bodyHTML(`<div class="set-row"><div><b>Quizzes ask about</b><span>${esc(FC.markers.cellsNote())} The answers always list every cell that's on.</span></div>${FC.markers.cellsHTML()}</div>`);
     } else {
     const a = prefs.appearance;

@@ -219,18 +219,21 @@
     savedCfg.dirs = k.cells || k.markers ? { cells: !!k.cells, markers: !!k.markers } : { cells: true, markers: true };
     delete savedCfg.kinds;
   }
-  const Q = { cfg: Object.assign({ topics: { markers: true, genetics: true }, formats: { swipe: true, single: true, multi: true, type: false }, dirs: { cells: true, markers: true }, cells: 'both' }, savedCfg), draft: '', msg: null, typed: null, q: null, picked: new Set(), crossed: new Set(), done: false, right: null, score: 0, answered: 0, streak: 0 };
+  const Q = { cfg: Object.assign({ content: null, topics: { markers: true, genetics: true }, formats: { swipe: true, single: true, multi: true, type: false }, dirs: { cells: true, markers: true }, cells: 'both' }, savedCfg), draft: '', msg: null, typed: null, q: null, picked: new Set(), crossed: new Set(), done: false, right: null, score: 0, answered: 0, streak: 0 };
   const best = () => load('flowcyto.markersBest', 0);
+  // the Quizzes' own content (null: Settings → Content); read while a quiz is open
+  CT.scope('quiz', () => Q.cfg.content, v => { Q.cfg.content = v; }, () => { save('flowcyto.markers', Q.cfg); if (!$('#quiz').hidden && !Q.q) setup(); });
 
   // ---------- views ----------
   function open() {
     $('#menu').hidden = true; $('#game').hidden = true; $('#quiz').hidden = false;
     document.documentElement.classList.add('in-game');
     document.title = 'FlowCyto · Quizzes';
+    CT.use('quiz');
     Q.score = 0; Q.answered = 0; Q.streak = 0;
     setup();
   }
-  function close() { $('#quiz').hidden = true; hideFull(); }
+  function close() { $('#quiz').hidden = true; hideFull(); CT.use(null); }
   const bar = () => `<header class="bar"><div class="bar-in"><button class="iconbtn" data-qmenu aria-label="Main menu">${ICON.back}<span>Menu</span></button><div class="gtitle"><b>Quizzes</b><span>${Q.answered ? `${Q.score} of ${Q.answered} · streak ${Q.streak} · best ${best()}` : `best streak ${best()}`}</span></div><span class="bar-btns"><button class="iconbtn" data-qmaster aria-label="Master reference">${FC.master.ICON}<span>Reference</span></button><button class="iconbtn" data-qsettings aria-label="Settings">${ICON.gear}<span>Settings</span></button></span></div></header>`;
   // the quiz's own settings: shown on the start screen and at the top of Settings
   const chipOf = (attr, on, label) => `<button class="qchip" ${attr} aria-pressed="${on}">${on ? ICON.yes : '<span class="ic"></span>'}<span>${label}</span></button>`;
@@ -244,8 +247,8 @@
   const modeHTML = () => `<div class="qrow col"><div><b>Topics</b></div>${topicsHTML()}</div><div class="qrow col"><div><b>Answer formats</b></div>${kindsHTML()}</div><div class="qrow"><div><b>Directions</b><span>For every format but swipe: name the cells for a marker or lesion, the markers or lesions for a cell, or both.</span></div>${dirsHTML()}</div><div class="qrow"><div><b>Cell types</b><span>${cellsNote()}</span></div>${cellsHTML()}</div>`;
   function setup() {
     Q.q = null;
-    $('#quiz').innerHTML = bar() + `<main class="qmain"><section class="qcard setup card"><h2>Quizzes</h2><p class="sub">Endless quizzes on which cells carry which markers, and which translocations and mutations go with which malignancies. Pick any mix of topics and answer formats; change them any time in Settings. Settings → Content sets the level.</p>
-      ${modeHTML()}<button class="btn primary big" data-qstart>Start</button></section></main>`;
+    $('#quiz').innerHTML = bar() + `<main class="qmain"><section class="qcard setup card"><h2>Quizzes</h2><p class="sub">Endless quizzes on which cells carry which markers, and which translocations and mutations go with which malignancies. Pick any mix of topics and answer formats; change them any time in Settings. The level comes from Settings → Content, unless Advanced below gives the Quizzes their own.</p>
+      ${modeHTML()}${CT.advancedHTML('quiz', 'quizzes')}<button class="btn primary big" data-qstart>Start</button></section></main>`;
   }
   function next() {
     if (Q.auto) { clearTimeout(Q.auto.timer); clearInterval(Q.auto.tick); } Q.auto = null;
@@ -459,6 +462,7 @@
       return;
     }
     if (!ev.target.closest('#quiz')) return;
+    if (CT.click(ev, () => { if (!Q.q) setup(); })) return;
     if (ev.target.closest('[data-qmenu]')) { location.hash = '/'; return; }
     if (ev.target.closest('[data-qsettings]')) return FC.openSettings();
     if (ev.target.closest('[data-qmaster]')) return FC.master.open();

@@ -740,3 +740,18 @@ html, body { touch-action: manipulation; }
 #settings .set-row > .seg, .qrow > .seg { flex: 1 0 auto; }
 #settings .set-row > .seg button, .qrow > .seg button { flex: 1 1 auto; }
 .seg button:disabled { opacity: .4; cursor: not-allowed; text-decoration: line-through; }
+
+/* Advanced: the Quizzes' and Custom boards' own content */
+#acts { max-height: min(88vh, 820px); overflow: auto; overscroll-behavior: contain; }
+details.ct-adv { margin: 14px 0 12px; border: 1.5px solid var(--line); border-radius: 12px; background: var(--card); }
+details.ct-adv > summary { display: flex; align-items: center; gap: 10px; padding: 12px 14px; cursor: pointer; list-style: none; }
+details.ct-adv > summary::-webkit-details-marker { display: none; }
+details.ct-adv > summary::before { content: ''; flex: none; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform .15s; margin-right: 2px; }
+details.ct-adv[open] > summary::before { transform: rotate(45deg); }
+.ct-adv-t { display: flex; flex-direction: column; min-width: 0; }
+.ct-adv-t b { font-size: var(--fs-sm); }
+.ct-adv-t > span { font-size: var(--fs-xs); color: var(--muted); margin-top: 2px; }
+.ct-adv-in { padding: 0 14px 14px; }
+.ct-adv-in > .set-row:first-child { border-top: 1px solid var(--line-soft); }
+.ct-adv-in .set-row > div:first-child { flex-grow: 1000; }
+.ct-adv-in .help { margin: 6px 0 0; font-size: var(--fs-xs); color: var(--muted); }
