@@ -231,7 +231,7 @@
     document.title = 'FlowCyto · Quizzes';
     CT.use('quiz');
     Q.score = 0; Q.answered = 0; Q.streak = 0;
-    setup();
+    setup(true);
   }
   // leaving the Quizzes ends their one-off content
   function close() { $('#quiz').hidden = true; hideFull(); CT.use(null); if (Q.cfg.content) { Q.cfg.content = null; save('flowcyto.markers', Q.cfg); } }
@@ -246,10 +246,13 @@
   // what the Cell types row says
   const cellsNote = () => 'Normal cells, abnormal ones (neoplasms and clones), or both.' + (Q.cfg.topics.genetics ? ` Translocations and mutations are only about abnormal cells${Q.cfg.topics.markers ? ', so Normal needs that topic off' : ''}.` : '');
   const modeHTML = () => `<div class="qrow col"><div><b>Topics</b></div>${topicsHTML()}</div><div class="qrow col"><div><b>Answer formats</b></div>${kindsHTML()}</div><div class="qrow"><div><b>Directions</b><span>For every format but swipe: name the cells for a marker or lesion, the markers or lesions for a cell, or both.</span></div>${dirsHTML()}</div><div class="qrow"><div><b>Cell types</b><span>${cellsNote()}</span></div>${cellsHTML()}</div>`;
-  function setup() {
+  // redraws keep the page where it was (changing a switch far down shouldn't jump to the top); opening starts at the top
+  function setup(fresh) {
     Q.q = null;
+    const old = $('#quiz .qmain'), y = !fresh && old ? old.scrollTop : 0;
     $('#quiz').innerHTML = bar() + `<main class="qmain"><section class="qcard setup card"><h2>Quizzes</h2><p class="sub">Endless quizzes on which cells carry which markers, and which translocations and mutations go with which malignancies. Pick any mix of topics and answer formats; change them any time in Settings. The level comes from Settings → Content, unless Advanced below gives the Quizzes their own.</p>
       ${modeHTML()}${CT.advancedHTML('quiz', 'quizzes')}<button class="btn primary big" data-qstart>Start</button></section></main>`;
+    if (y) $('#quiz .qmain').scrollTop = y;
   }
   function next() {
     if (Q.auto) { clearTimeout(Q.auto.timer); clearInterval(Q.auto.tick); } Q.auto = null;
